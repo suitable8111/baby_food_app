@@ -1,0 +1,38 @@
+name: baby_food_app
+description: "이유식 분석 및 영양소 계산 앱"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # 상태 관리
+  provider: ^6.1.2
+
+  # 차트 (영양소 시각화)
+  fl_chart: ^0.69.0
+
+  # 라우팅
+  go_router: ^14.6.2
+
+  # 로컬 저장소
+  shared_preferences: ^2.3.3
+
+  # 날짜/숫자 포맷
+  intl: ^0.20.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
