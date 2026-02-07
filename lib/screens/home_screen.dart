@@ -1,8 +1,11 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/ingredient.dart';
 import '../providers/recipe_provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/image_service.dart';
 import '../widgets/recipe_card.dart';
 import 'recipe_list_screen.dart';
 import 'recipe_detail_screen.dart';
@@ -10,6 +13,9 @@ import 'nutrition_calculator_screen.dart';
 import 'auth_screen.dart';
 import 'favorites_screen.dart';
 import 'my_recipes_screen.dart';
+import 'shared_recipes_screen.dart';
+import 'board_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -17,6 +23,8 @@ class HomeScreen extends StatelessWidget {
   Widget _buildDrawer(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final isLoggedIn = authProvider.isAuthenticated;
+    final profile = authProvider.userProfile;
+    final babyStage = profile?.babyStage;
 
     return Drawer(
       child: Column(
@@ -26,33 +34,48 @@ class HomeScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.primary,
             ),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: isLoggedIn
-                  ? Text(
-                      (authProvider.displayName?.isNotEmpty == true
-                              ? authProvider.displayName![0]
-                              : authProvider.userEmail?[0] ?? 'U')
-                          .toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    )
-                  : Icon(
-                      Icons.person,
-                      size: 32,
-                      color: Theme.of(context).colorScheme.primary,
+            currentAccountPicture: _buildDrawerAvatar(context, authProvider),
+            accountName: Row(
+              children: [
+                Text(
+                  isLoggedIn ? (authProvider.displayName ?? '사용자') : '로그인이 필요합니다',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                if (isLoggedIn && babyStage != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _getStageColorForDrawer(babyStage),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-            ),
-            accountName: Text(
-              isLoggedIn ? (authProvider.displayName ?? '사용자') : '로그인이 필요합니다',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+                    child: Text(
+                      babyStage.shortName,
+                      style: const TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ],
             ),
             accountEmail: Text(
-              isLoggedIn ? (authProvider.userEmail ?? '') : '로그인하여 더 많은 기능을 사용하세요',
+              isLoggedIn
+                  ? (profile?.babyName != null
+                      ? '${profile!.babyName} ${profile.babyAgeText != null ? "(${profile.babyAgeText})" : ""}'
+                      : authProvider.userEmail ?? '')
+                  : '로그인하여 더 많은 기능을 사용하세요',
             ),
+            onDetailsPressed: isLoggedIn
+                ? () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const ProfileScreen()),
+                    );
+                  }
+                : null,
           ),
 
           // 메뉴 항목
@@ -103,6 +126,21 @@ class HomeScreen extends StatelessWidget {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.person, color: Colors.green),
+            title: const Text('내 프로필'),
+            onTap: () {
+              Navigator.pop(context);
+              if (!isLoggedIn) {
+                _showLoginRequired(context);
+                return;
+              }
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.book, color: Colors.blue),
             title: const Text('나만의 레시피'),
             onTap: () {
@@ -114,6 +152,64 @@ class HomeScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const MyRecipesScreen()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.mail, color: Colors.teal),
+            title: Row(
+              children: [
+                const Text('레시피 공유함'),
+                if (isLoggedIn)
+                  Consumer<RecipeProvider>(
+                    builder: (context, provider, _) {
+                      final count = provider.pendingShareCount;
+                      if (count == 0) return const SizedBox.shrink();
+                      return Container(
+                        margin: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              if (!isLoggedIn) {
+                _showLoginRequired(context);
+                return;
+              }
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const SharedRecipesScreen()),
+              );
+            },
+          ),
+
+          const Divider(),
+
+          ListTile(
+            leading: const Icon(Icons.forum, color: Colors.deepPurple),
+            title: const Text('레시피 게시판'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BoardScreen()),
               );
             },
           ),
@@ -159,6 +255,55 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildDrawerAvatar(BuildContext context, AuthProvider authProvider) {
+    final profile = authProvider.userProfile;
+    final photoPath = profile?.babyPhotoPath;
+
+    // 아기 사진이 있으면 사진 표시
+    if (photoPath != null && !kIsWeb && ImageService().isLocalFile(photoPath)) {
+      final file = File(photoPath);
+      if (file.existsSync()) {
+        return CircleAvatar(
+          backgroundColor: Colors.white,
+          backgroundImage: FileImage(file),
+        );
+      }
+    }
+
+    // 기본 아바타
+    return CircleAvatar(
+      backgroundColor: Colors.white,
+      child: authProvider.isAuthenticated
+          ? Text(
+              (authProvider.displayName?.isNotEmpty == true
+                      ? authProvider.displayName![0]
+                      : authProvider.userEmail?[0] ?? 'U')
+                  .toUpperCase(),
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            )
+          : Icon(
+              Icons.person,
+              size: 32,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+    );
+  }
+
+  Color _getStageColorForDrawer(BabyFoodStage stage) {
+    switch (stage) {
+      case BabyFoodStage.early:
+        return Colors.green.shade300;
+      case BabyFoodStage.middle:
+        return Colors.orange.shade300;
+      case BabyFoodStage.late:
+        return Colors.purple.shade300;
+    }
+  }
+
   void _showLoginRequired(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -184,7 +329,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('이유식 분석'),
+        title: const Text('동백이 밥창고'),
         centerTitle: true,
         elevation: 0,
       ),

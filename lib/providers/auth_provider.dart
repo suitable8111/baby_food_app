@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../models/user_profile.dart';
 import '../services/firebase_service.dart';
 
 /// 인증 상태
@@ -18,6 +19,7 @@ class AuthProvider extends ChangeNotifier {
   AuthStatus _status = AuthStatus.initial;
   User? _user;
   String? _errorMessage;
+  UserProfile? _userProfile;
 
   AuthProvider(this._firebaseService) {
     // 인증 상태 변화 구독
@@ -32,17 +34,53 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _status == AuthStatus.loading;
   String? get userId => _user?.uid;
   String? get userEmail => _user?.email;
-  String? get displayName => _user?.displayName;
+  String? get displayName => _userProfile?.nickname ?? _user?.displayName;
+  bool get isAdmin => _user?.email == 'suitable8111@gmail.com';
+  UserProfile? get userProfile => _userProfile;
 
   /// 인증 상태 변화 핸들러
-  void _onAuthStateChanged(User? user) {
+  void _onAuthStateChanged(User? user) async {
     _user = user;
     if (user != null) {
       _status = AuthStatus.authenticated;
+      await loadUserProfile();
     } else {
       _status = AuthStatus.unauthenticated;
+      _userProfile = null;
     }
     notifyListeners();
+  }
+
+  /// 사용자 프로필 로드
+  Future<void> loadUserProfile() async {
+    if (_user == null) return;
+    try {
+      _userProfile = await _firebaseService.getUserProfile(_user!.uid);
+      // 프로필이 없으면 기본값으로 생성
+      _userProfile ??= UserProfile(
+        userId: _user!.uid,
+        email: _user!.email ?? '',
+      );
+      notifyListeners();
+    } catch (e) {
+      debugPrint('프로필 로드 실패: $e');
+    }
+  }
+
+  /// 사용자 프로필 업데이트
+  Future<bool> updateUserProfile(UserProfile profile) async {
+    if (_user == null) return false;
+    try {
+      await _firebaseService.updateUserProfile(_user!.uid, profile.toJson());
+      _userProfile = profile;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('프로필 업데이트 실패: $e');
+      _errorMessage = '프로필 저장에 실패했습니다.';
+      notifyListeners();
+      return false;
+    }
   }
 
   /// 회원가입
@@ -115,6 +153,7 @@ class AuthProvider extends ChangeNotifier {
       await _firebaseService.signOut();
       _status = AuthStatus.unauthenticated;
       _user = null;
+      _userProfile = null;
       notifyListeners();
     } catch (e) {
       _errorMessage = '로그아웃 중 오류가 발생했습니다.';

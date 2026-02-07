@@ -176,6 +176,12 @@ class MyRecipesScreen extends StatelessWidget {
                                     RecipeDetailScreen(recipe: recipe),
                               ),
                             );
+                          } else if (value == 'share') {
+                            _showShareDialog(context, recipe);
+                          } else if (value == 'publish') {
+                            _showPublishConfirm(context, recipe);
+                          } else if (value == 'delete') {
+                            _showDeleteConfirm(context, recipe);
                           }
                         },
                         itemBuilder: (context) => [
@@ -199,6 +205,36 @@ class MyRecipesScreen extends StatelessWidget {
                               ],
                             ),
                           ),
+                          const PopupMenuItem(
+                            value: 'share',
+                            child: Row(
+                              children: [
+                                Icon(Icons.share, size: 20),
+                                SizedBox(width: 8),
+                                Text('공유'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'publish',
+                            child: Row(
+                              children: [
+                                Icon(Icons.publish, size: 20),
+                                SizedBox(width: 8),
+                                Text('게시판에 올리기'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete, size: 20, color: Colors.red),
+                                SizedBox(width: 8),
+                                Text('삭제', style: TextStyle(color: Colors.red)),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                       onTap: () => Navigator.push(
@@ -213,6 +249,125 @@ class MyRecipesScreen extends StatelessWidget {
               },
             ),
     );
+  }
+
+  void _showShareDialog(BuildContext context, recipe) {
+    final emailController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('레시피 공유'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "'${recipe.name}' 레시피를 공유할 이메일을 입력하세요.",
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: '받는 사람 이메일',
+                hintText: 'example@email.com',
+                prefixIcon: Icon(Icons.email),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final email = emailController.text.trim();
+              if (email.isEmpty || !email.contains('@')) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('올바른 이메일을 입력해주세요.')),
+                );
+                return;
+              }
+              Navigator.pop(context);
+              final recipeProvider = context.read<RecipeProvider>();
+              final success = await recipeProvider.shareRecipe(recipe, email);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                        success ? '$email에게 레시피를 공유했습니다!' : '공유에 실패했습니다.'),
+                  ),
+                );
+              }
+            },
+            child: const Text('공유'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPublishConfirm(BuildContext context, recipe) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('게시판에 올리기'),
+        content: Text("'${recipe.name}' 레시피를 게시판에 공유하시겠습니까?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('게시'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && context.mounted) {
+      final recipeProvider = context.read<RecipeProvider>();
+      final success = await recipeProvider.publishToBoard(recipe);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success ? '레시피가 게시판에 공유되었습니다!' : '게시에 실패했습니다.'),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showDeleteConfirm(BuildContext context, recipe) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('레시피 삭제'),
+        content: Text("'${recipe.name}' 레시피를 삭제하시겠습니까?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && context.mounted) {
+      final recipeProvider = context.read<RecipeProvider>();
+      await recipeProvider.deleteUserRecipe(recipe.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("'${recipe.name}' 레시피가 삭제되었습니다.")),
+        );
+      }
+    }
   }
 
   Widget _buildRecipeThumbnail(recipe) {

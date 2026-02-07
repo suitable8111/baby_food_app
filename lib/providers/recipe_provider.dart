@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import '../models/ingredient.dart';
 import '../models/recipe.dart';
 import '../models/nutrition.dart';
+import '../models/shared_recipe.dart';
+import '../models/board_recipe.dart';
 import '../services/firebase_service.dart';
 import '../data/ingredients_data.dart';
 import '../data/recipes_data.dart' as local_recipes;
@@ -13,6 +15,10 @@ class RecipeProvider extends ChangeNotifier {
   List<Recipe> _userRecipes = [];
   List<Ingredient> _ingredients = [];
   Set<String> _favoriteIds = {};
+
+  List<SharedRecipe> _receivedShares = [];
+  List<SharedRecipe> _sentShares = [];
+  List<BoardRecipe> _boardRecipes = [];
 
   BabyFoodStage? _selectedStage;
   String _searchQuery = '';
@@ -32,6 +38,10 @@ class RecipeProvider extends ChangeNotifier {
   String get searchQuery => _searchQuery;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  List<SharedRecipe> get receivedShares => _receivedShares;
+  List<SharedRecipe> get sentShares => _sentShares;
+  List<BoardRecipe> get boardRecipes => _boardRecipes;
+  bool get isAdmin => _firebaseService.isAdmin;
 
   /// 필터링된 레시피 목록
   List<Recipe> get filteredRecipes {
@@ -135,6 +145,9 @@ class RecipeProvider extends ChangeNotifier {
       _userRecipes =
           await _firebaseService.getUserRecipes(_firebaseService.currentUserId!);
       _favoriteIds = (await _firebaseService.getFavoriteRecipeIds()).toSet();
+      await loadReceivedShares();
+      await loadSentShares();
+      await loadBoardRecipes();
       notifyListeners();
     }
   }
@@ -143,6 +156,8 @@ class RecipeProvider extends ChangeNotifier {
   void onUserLogout() {
     _userRecipes = [];
     _favoriteIds = {};
+    _receivedShares = [];
+    _sentShares = [];
     notifyListeners();
   }
 
@@ -263,5 +278,176 @@ class RecipeProvider extends ChangeNotifier {
     } catch (e) {
       return null;
     }
+  }
+
+  // ==================== 1:1 레시피 공유 ====================
+
+  /// 레시피 공유
+  Future<bool> shareRecipe(Recipe recipe, String receiverEmail) async {
+    if (!_firebaseService.isLoggedIn) return false;
+
+    try {
+      await _firebaseService.shareRecipe(
+        recipe: recipe,
+        receiverEmail: receiverEmail,
+      );
+      await loadSentShares();
+      return true;
+    } catch (e) {
+      _errorMessage = '레시피 공유에 실패했습니다.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// 받은 공유 로드
+  Future<void> loadReceivedShares() async {
+    if (!_firebaseService.isLoggedIn) return;
+    try {
+      _receivedShares = await _firebaseService
+          .getReceivedShares(_firebaseService.currentUser!.email!);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('받은 공유 로드 실패: $e');
+    }
+  }
+
+  /// 보낸 공유 로드
+  Future<void> loadSentShares() async {
+    if (!_firebaseService.isLoggedIn) return;
+    try {
+      _sentShares = await _firebaseService
+          .getSentShares(_firebaseService.currentUserId!);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('보낸 공유 로드 실패: $e');
+    }
+  }
+
+  /// 공유 수락 (내 레시피로 저장)
+  Future<bool> acceptShare(SharedRecipe share) async {
+    if (!_firebaseService.isLoggedIn) return false;
+
+    try {
+      await _firebaseService.acceptSharedRecipe(share.id);
+      final recipe = share.toRecipe().copyWith(
+            id: '',
+            userId: _firebaseService.currentUserId,
+            createdAt: DateTime.now(),
+          );
+      await addUserRecipe(recipe);
+      await loadReceivedShares();
+      return true;
+    } catch (e) {
+      _errorMessage = '공유 수락에 실패했습니다.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// 공유 거절
+  Future<bool> declineShare(String shareId) async {
+    if (!_firebaseService.isLoggedIn) return false;
+
+    try {
+      await _firebaseService.declineSharedRecipe(shareId);
+      await loadReceivedShares();
+      return true;
+    } catch (e) {
+      _errorMessage = '공유 거절에 실패했습니다.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// 대기 중인 공유 수
+  int get pendingShareCount =>
+      _receivedShares.where((s) => s.status == ShareStatus.pending).length;
+
+  // ==================== 레시피 게시판 ====================
+
+  /// 게시판 레시피 로드
+  Future<void> loadBoardRecipes() async {
+    try {
+      _boardRecipes = await _firebaseService.getBoardRecipes();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('게시판 레시피 로드 실패: $e');
+    }
+  }
+
+  /// 게시판에 레시피 게시
+  Future<bool> publishToBoard(Recipe recipe) async {
+    if (!_firebaseService.isLoggedIn) return false;
+
+    try {
+      await _firebaseService.publishToBoard(recipe);
+      await loadBoardRecipes();
+      return true;
+    } catch (e) {
+      _errorMessage = '게시판 게시에 실패했습니다.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// 게시판 레시피를 내 레시피로 저장
+  Future<String?> saveBoardRecipeToMyRecipes(BoardRecipe boardRecipe) async {
+    if (!_firebaseService.isLoggedIn) return null;
+
+    final recipe = boardRecipe.toRecipe().copyWith(
+          id: '',
+          userId: _firebaseService.currentUserId,
+          createdAt: DateTime.now(),
+        );
+    return addUserRecipe(recipe);
+  }
+
+  /// 게시판 레시피 수정 (작성자 또는 관리자)
+  Future<bool> updateBoardRecipe(String boardId, Recipe recipe) async {
+    if (!_firebaseService.isLoggedIn) return false;
+
+    try {
+      await _firebaseService.updateBoardRecipe(boardId, recipe);
+      await loadBoardRecipes();
+      return true;
+    } catch (e) {
+      _errorMessage = '게시판 레시피 수정에 실패했습니다.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// 게시판 레시피 삭제 (작성자 또는 관리자)
+  Future<bool> deleteBoardRecipe(String boardId) async {
+    if (!_firebaseService.isLoggedIn) return false;
+
+    try {
+      await _firebaseService.deleteBoardRecipe(boardId);
+      await loadBoardRecipes();
+      return true;
+    } catch (e) {
+      _errorMessage = '게시판 레시피 삭제에 실패했습니다.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// 게시판 레시피 편집/삭제 권한 확인
+  bool canEditBoardRecipe(BoardRecipe boardRecipe) {
+    if (!_firebaseService.isLoggedIn) return false;
+    return _firebaseService.isAdmin ||
+        boardRecipe.authorUserId == _firebaseService.currentUserId;
+  }
+
+  /// 게시판 즐겨찾기 토글
+  Future<bool> toggleBoardFavorite(String boardId) async {
+    final favoriteKey = 'board_$boardId';
+    return toggleFavorite(favoriteKey);
+  }
+
+  /// 게시판 즐겨찾기 여부
+  bool isBoardFavorite(String boardId) {
+    return isFavorite('board_$boardId');
   }
 }

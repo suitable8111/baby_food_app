@@ -2,6 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/ingredient.dart';
 import '../models/recipe.dart';
+import '../models/shared_recipe.dart';
+import '../models/board_recipe.dart';
+import '../models/user_profile.dart';
 
 /// Firebase 서비스 클래스
 /// Firestore 데이터 CRUD 및 인증 관리
@@ -13,11 +16,14 @@ class FirebaseService {
   CollectionReference get _ingredientsRef => _firestore.collection('ingredients');
   CollectionReference get _recipesRef => _firestore.collection('recipes');
   CollectionReference get _usersRef => _firestore.collection('users');
+  CollectionReference get _sharedRecipesRef => _firestore.collection('shared_recipes');
+  CollectionReference get _boardRecipesRef => _firestore.collection('board_recipes');
 
   // 현재 사용자
   User? get currentUser => _auth.currentUser;
   String? get currentUserId => _auth.currentUser?.uid;
   bool get isLoggedIn => _auth.currentUser != null;
+  bool get isAdmin => _auth.currentUser?.email == 'suitable8111@gmail.com';
 
   // ==================== 인증 ====================
 
@@ -254,5 +260,116 @@ class FirebaseService {
   Future<bool> hasInitialData() async {
     final ingredientsSnapshot = await _ingredientsRef.limit(1).get();
     return ingredientsSnapshot.docs.isNotEmpty;
+  }
+
+  // ==================== 사용자 프로필 ====================
+
+  /// 사용자 프로필 로드
+  Future<UserProfile?> getUserProfile(String userId) async {
+    final doc = await _usersRef.doc(userId).get();
+    if (!doc.exists) return null;
+    return UserProfile.fromFirestore(doc);
+  }
+
+  /// 사용자 프로필 업데이트
+  Future<void> updateUserProfile(String userId, Map<String, dynamic> data) async {
+    await _usersRef.doc(userId).set(data, SetOptions(merge: true));
+  }
+
+  // ==================== 1:1 레시피 공유 ====================
+
+  /// 레시피 공유
+  Future<String> shareRecipe({
+    required Recipe recipe,
+    required String receiverEmail,
+  }) async {
+    final docRef = await _sharedRecipesRef.add({
+      'senderUserId': currentUserId,
+      'senderEmail': currentUser?.email,
+      'receiverEmail': receiverEmail,
+      'recipeData': recipe.toJson(),
+      'status': ShareStatus.pending.name,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return docRef.id;
+  }
+
+  /// 받은 공유 목록
+  Future<List<SharedRecipe>> getReceivedShares(String email) async {
+    final snapshot = await _sharedRecipesRef
+        .where('receiverEmail', isEqualTo: email)
+        .get();
+    final list = snapshot.docs.map((doc) => SharedRecipe.fromFirestore(doc)).toList();
+    list.sort((a, b) => (b.createdAt ?? DateTime(2000)).compareTo(a.createdAt ?? DateTime(2000)));
+    return list;
+  }
+
+  /// 보낸 공유 목록
+  Future<List<SharedRecipe>> getSentShares(String userId) async {
+    final snapshot = await _sharedRecipesRef
+        .where('senderUserId', isEqualTo: userId)
+        .get();
+    final list = snapshot.docs.map((doc) => SharedRecipe.fromFirestore(doc)).toList();
+    list.sort((a, b) => (b.createdAt ?? DateTime(2000)).compareTo(a.createdAt ?? DateTime(2000)));
+    return list;
+  }
+
+  /// 공유 수락
+  Future<void> acceptSharedRecipe(String shareId) async {
+    await _sharedRecipesRef.doc(shareId).update({
+      'status': ShareStatus.accepted.name,
+    });
+  }
+
+  /// 공유 거절
+  Future<void> declineSharedRecipe(String shareId) async {
+    await _sharedRecipesRef.doc(shareId).update({
+      'status': ShareStatus.declined.name,
+    });
+  }
+
+  /// 이메일로 사용자 존재 여부 확인
+  Future<bool> userExistsByEmail(String email) async {
+    final snapshot = await _usersRef
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+    return snapshot.docs.isNotEmpty;
+  }
+
+  // ==================== 레시피 게시판 ====================
+
+  /// 게시판에 레시피 게시
+  Future<String> publishToBoard(Recipe recipe) async {
+    final docRef = await _boardRecipesRef.add({
+      'recipeData': recipe.toJson(),
+      'authorUserId': currentUserId,
+      'authorEmail': currentUser?.email,
+      'authorDisplayName': currentUser?.displayName,
+      'publishedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    return docRef.id;
+  }
+
+  /// 게시판 레시피 목록
+  Future<List<BoardRecipe>> getBoardRecipes() async {
+    final snapshot = await _boardRecipesRef
+        .orderBy('publishedAt', descending: true)
+        .get();
+    return snapshot.docs.map((doc) => BoardRecipe.fromFirestore(doc)).toList();
+  }
+
+  /// 게시판 레시피 수정
+  Future<void> updateBoardRecipe(String boardId, Recipe recipe) async {
+    await _boardRecipesRef.doc(boardId).update({
+      'recipeData': recipe.toJson(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// 게시판 레시피 삭제
+  Future<void> deleteBoardRecipe(String boardId) async {
+    await _boardRecipesRef.doc(boardId).delete();
   }
 }
