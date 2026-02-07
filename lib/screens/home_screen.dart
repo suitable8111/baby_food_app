@@ -2,13 +2,183 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/ingredient.dart';
 import '../providers/recipe_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/recipe_card.dart';
 import 'recipe_list_screen.dart';
 import 'recipe_detail_screen.dart';
 import 'nutrition_calculator_screen.dart';
+import 'auth_screen.dart';
+import 'favorites_screen.dart';
+import 'my_recipes_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
+
+  Widget _buildDrawer(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final isLoggedIn = authProvider.isAuthenticated;
+
+    return Drawer(
+      child: Column(
+        children: [
+          // 헤더 - 사용자 정보 또는 로그인 안내
+          UserAccountsDrawerHeader(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            currentAccountPicture: CircleAvatar(
+              backgroundColor: Colors.white,
+              child: isLoggedIn
+                  ? Text(
+                      (authProvider.displayName?.isNotEmpty == true
+                              ? authProvider.displayName![0]
+                              : authProvider.userEmail?[0] ?? 'U')
+                          .toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    )
+                  : Icon(
+                      Icons.person,
+                      size: 32,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+            ),
+            accountName: Text(
+              isLoggedIn ? (authProvider.displayName ?? '사용자') : '로그인이 필요합니다',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            accountEmail: Text(
+              isLoggedIn ? (authProvider.userEmail ?? '') : '로그인하여 더 많은 기능을 사용하세요',
+            ),
+          ),
+
+          // 메뉴 항목
+          ListTile(
+            leading: const Icon(Icons.home),
+            title: const Text('홈'),
+            onTap: () => Navigator.pop(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.restaurant_menu),
+            title: const Text('레시피'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RecipeListScreen()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.calculate),
+            title: const Text('영양소 계산'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const NutritionCalculatorScreen()),
+              );
+            },
+          ),
+
+          const Divider(),
+
+          ListTile(
+            leading: const Icon(Icons.favorite, color: Colors.red),
+            title: const Text('즐겨찾기'),
+            onTap: () {
+              Navigator.pop(context);
+              if (!isLoggedIn) {
+                _showLoginRequired(context);
+                return;
+              }
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.book, color: Colors.blue),
+            title: const Text('나만의 레시피'),
+            onTap: () {
+              Navigator.pop(context);
+              if (!isLoggedIn) {
+                _showLoginRequired(context);
+                return;
+              }
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MyRecipesScreen()),
+              );
+            },
+          ),
+
+          const Spacer(),
+
+          // 하단: 로그인/로그아웃
+          const Divider(),
+          if (isLoggedIn)
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('로그아웃'),
+              onTap: () async {
+                Navigator.pop(context);
+                await authProvider.signOut();
+                if (context.mounted) {
+                  context.read<RecipeProvider>().onUserLogout();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('로그아웃되었습니다.')),
+                  );
+                }
+              },
+            )
+          else
+            ListTile(
+              leading: const Icon(Icons.login),
+              title: const Text('로그인'),
+              onTap: () async {
+                Navigator.pop(context);
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AuthScreen()),
+                );
+                if (context.mounted &&
+                    context.read<AuthProvider>().isAuthenticated) {
+                  context.read<RecipeProvider>().onUserLogin();
+                }
+              },
+            ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  void _showLoginRequired(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('로그인이 필요한 기능입니다.'),
+        action: SnackBarAction(
+          label: '로그인',
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AuthScreen()),
+            );
+            if (context.mounted &&
+                context.read<AuthProvider>().isAuthenticated) {
+              context.read<RecipeProvider>().onUserLogin();
+            }
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,6 +188,7 @@ class HomeScreen extends StatelessWidget {
         centerTitle: true,
         elevation: 0,
       ),
+      drawer: _buildDrawer(context),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -35,15 +206,15 @@ class HomeScreen extends StatelessWidget {
                   Text(
                     '우리 아기 이유식',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     '단계별 레시피와 영양소를 확인하세요',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey.shade600,
-                    ),
+                          color: Colors.grey.shade600,
+                        ),
                   ),
                 ],
               ),
@@ -58,8 +229,8 @@ class HomeScreen extends StatelessWidget {
                   Text(
                     '빠른 메뉴',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -88,7 +259,8 @@ class HomeScreen extends StatelessWidget {
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const NutritionCalculatorScreen(),
+                              builder: (_) =>
+                                  const NutritionCalculatorScreen(),
                             ),
                           ),
                         ),
@@ -100,7 +272,8 @@ class HomeScreen extends StatelessWidget {
             ),
 
             // 단계별 레시피 섹션
-            ...BabyFoodStage.values.map((stage) => _StageSection(stage: stage)),
+            ...BabyFoodStage.values
+                .map((stage) => _StageSection(stage: stage)),
 
             const SizedBox(height: 24),
           ],
@@ -148,8 +321,8 @@ class _QuickMenuCard extends StatelessWidget {
               Text(
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
               Text(
                 subtitle,
@@ -200,8 +373,8 @@ class _StageSection extends StatelessWidget {
                   Text(
                     stage.displayName,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                 ],
               ),
@@ -233,7 +406,35 @@ class _StageSection extends StatelessWidget {
                   child: RecipeCard(
                     recipe: recipe,
                     isFavorite: recipeProvider.isFavorite(recipe.id),
-                    onFavoriteToggle: () => recipeProvider.toggleFavorite(recipe.id),
+                    onFavoriteToggle: () async {
+                      final success =
+                          await recipeProvider.toggleFavorite(recipe.id);
+                      if (!success && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('로그인이 필요한 기능입니다.'),
+                            action: SnackBarAction(
+                              label: '로그인',
+                              onPressed: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => const AuthScreen()),
+                                );
+                                if (context.mounted &&
+                                    context
+                                        .read<AuthProvider>()
+                                        .isAuthenticated) {
+                                  context
+                                      .read<RecipeProvider>()
+                                      .onUserLogin();
+                                }
+                              },
+                            ),
+                          ),
+                        );
+                      }
+                    },
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(

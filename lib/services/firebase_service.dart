@@ -1,0 +1,258 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/ingredient.dart';
+import '../models/recipe.dart';
+
+/// Firebase 서비스 클래스
+/// Firestore 데이터 CRUD 및 인증 관리
+class FirebaseService {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // 컬렉션 참조
+  CollectionReference get _ingredientsRef => _firestore.collection('ingredients');
+  CollectionReference get _recipesRef => _firestore.collection('recipes');
+  CollectionReference get _usersRef => _firestore.collection('users');
+
+  // 현재 사용자
+  User? get currentUser => _auth.currentUser;
+  String? get currentUserId => _auth.currentUser?.uid;
+  bool get isLoggedIn => _auth.currentUser != null;
+
+  // ==================== 인증 ====================
+
+  /// 이메일 회원가입
+  Future<UserCredential> signUp({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    final credential = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+    // 사용자 프로필 업데이트
+    if (displayName != null) {
+      await credential.user?.updateDisplayName(displayName);
+    }
+
+    // Firestore에 사용자 문서 생성
+    await _usersRef.doc(credential.user!.uid).set({
+      'email': email,
+      'displayName': displayName,
+      'createdAt': FieldValue.serverTimestamp(),
+      'favoriteRecipes': [],
+    });
+
+    return credential;
+  }
+
+  /// 이메일 로그인
+  Future<UserCredential> signIn({
+    required String email,
+    required String password,
+  }) async {
+    return await _auth.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+  }
+
+  /// 로그아웃
+  Future<void> signOut() async {
+    await _auth.signOut();
+  }
+
+  /// 비밀번호 재설정 이메일
+  Future<void> sendPasswordResetEmail(String email) async {
+    await _auth.sendPasswordResetEmail(email: email);
+  }
+
+  /// 인증 상태 스트림
+  Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  // ==================== 식재료 ====================
+
+  /// 모든 식재료 가져오기
+  Future<List<Ingredient>> getIngredients() async {
+    final snapshot = await _ingredientsRef.get();
+    return snapshot.docs.map((doc) => Ingredient.fromFirestore(doc)).toList();
+  }
+
+  /// 식재료 스트림
+  Stream<List<Ingredient>> ingredientsStream() {
+    return _ingredientsRef.snapshots().map((snapshot) =>
+        snapshot.docs.map((doc) => Ingredient.fromFirestore(doc)).toList());
+  }
+
+  /// 식재료 추가 (관리자용)
+  Future<void> addIngredient(Ingredient ingredient) async {
+    await _ingredientsRef.doc(ingredient.id).set(ingredient.toJson());
+  }
+
+  /// 여러 식재료 일괄 추가
+  Future<void> addIngredientsBatch(List<Ingredient> ingredients) async {
+    final batch = _firestore.batch();
+    for (var ingredient in ingredients) {
+      batch.set(_ingredientsRef.doc(ingredient.id), ingredient.toJson());
+    }
+    await batch.commit();
+  }
+
+  // ==================== 레시피 ====================
+
+  /// 기본 레시피 가져오기 (userId가 null인 것들)
+  Future<List<Recipe>> getDefaultRecipes() async {
+    final snapshot = await _recipesRef
+        .where('userId', isNull: true)
+        .get();
+    return snapshot.docs.map((doc) => Recipe.fromFirestore(doc)).toList();
+  }
+
+  /// 기본 레시피 스트림
+  Stream<List<Recipe>> defaultRecipesStream() {
+    return _recipesRef
+        .where('userId', isNull: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Recipe.fromFirestore(doc)).toList());
+  }
+
+  /// 사용자 커스텀 레시피 가져오기
+  Future<List<Recipe>> getUserRecipes(String userId) async {
+    final snapshot = await _recipesRef
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .get();
+    return snapshot.docs.map((doc) => Recipe.fromFirestore(doc)).toList();
+  }
+
+  /// 사용자 레시피 스트림
+  Stream<List<Recipe>> userRecipesStream(String userId) {
+    return _recipesRef
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Recipe.fromFirestore(doc)).toList());
+  }
+
+  /// 레시피 추가
+  Future<String> addRecipe(Recipe recipe) async {
+    final docRef = await _recipesRef.add({
+      ...recipe.toJson(),
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    return docRef.id;
+  }
+
+  /// 기본 레시피 추가 (관리자용)
+  Future<void> addDefaultRecipe(Recipe recipe) async {
+    await _recipesRef.doc(recipe.id).set({
+      ...recipe.toJson(),
+      'userId': null,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// 여러 기본 레시피 일괄 추가
+  Future<void> addDefaultRecipesBatch(List<Recipe> recipes) async {
+    final batch = _firestore.batch();
+    for (var recipe in recipes) {
+      final data = recipe.toJson();
+      data['userId'] = null;
+      data['createdAt'] = FieldValue.serverTimestamp();
+      batch.set(_recipesRef.doc(recipe.id), data);
+    }
+    await batch.commit();
+  }
+
+  /// 레시피 수정
+  Future<void> updateRecipe(String recipeId, Recipe recipe) async {
+    await _recipesRef.doc(recipeId).update({
+      ...recipe.toJson(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// 레시피 삭제
+  Future<void> deleteRecipe(String recipeId) async {
+    await _recipesRef.doc(recipeId).delete();
+  }
+
+  /// 레시피 ID로 가져오기
+  Future<Recipe?> getRecipeById(String recipeId) async {
+    final doc = await _recipesRef.doc(recipeId).get();
+    if (doc.exists) {
+      return Recipe.fromFirestore(doc);
+    }
+    return null;
+  }
+
+  // ==================== 즐겨찾기 ====================
+
+  /// 즐겨찾기 토글
+  Future<void> toggleFavorite(String recipeId) async {
+    if (currentUserId == null) return;
+
+    final userDoc = _usersRef.doc(currentUserId);
+    final userData = await userDoc.get();
+
+    List<String> favorites;
+
+    if (userData.exists) {
+      favorites = List<String>.from(
+          (userData.data() as Map<String, dynamic>)['favoriteRecipes'] ?? []);
+    } else {
+      // 사용자 문서가 없으면 생성
+      favorites = [];
+    }
+
+    if (favorites.contains(recipeId)) {
+      favorites.remove(recipeId);
+    } else {
+      favorites.add(recipeId);
+    }
+
+    // set with merge를 사용하여 문서가 없으면 생성, 있으면 업데이트
+    await userDoc.set({
+      'favoriteRecipes': favorites,
+      'email': currentUser?.email,
+    }, SetOptions(merge: true));
+  }
+
+  /// 즐겨찾기 목록 가져오기
+  Future<List<String>> getFavoriteRecipeIds() async {
+    if (currentUserId == null) return [];
+
+    final userData = await _usersRef.doc(currentUserId).get();
+    if (userData.exists) {
+      return List<String>.from(
+          (userData.data() as Map<String, dynamic>)['favoriteRecipes'] ?? []);
+    }
+    return [];
+  }
+
+  /// 즐겨찾기 스트림
+  Stream<List<String>> favoriteRecipeIdsStream() {
+    if (currentUserId == null) return Stream.value([]);
+
+    return _usersRef.doc(currentUserId).snapshots().map((doc) {
+      if (doc.exists) {
+        return List<String>.from(
+            (doc.data() as Map<String, dynamic>)['favoriteRecipes'] ?? []);
+      }
+      return <String>[];
+    });
+  }
+
+  // ==================== 초기 데이터 업로드 ====================
+
+  /// 초기 데이터가 있는지 확인
+  Future<bool> hasInitialData() async {
+    final ingredientsSnapshot = await _ingredientsRef.limit(1).get();
+    return ingredientsSnapshot.docs.isNotEmpty;
+  }
+}

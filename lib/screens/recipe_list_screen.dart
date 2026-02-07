@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/ingredient.dart';
 import '../providers/recipe_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/recipe_card.dart';
 import 'recipe_detail_screen.dart';
+import 'auth_screen.dart';
 
 class RecipeListScreen extends StatelessWidget {
   const RecipeListScreen({super.key});
@@ -72,7 +73,35 @@ class RecipeListScreen extends StatelessWidget {
                       return RecipeCard(
                         recipe: recipe,
                         isFavorite: recipeProvider.isFavorite(recipe.id),
-                        onFavoriteToggle: () => recipeProvider.toggleFavorite(recipe.id),
+                        onFavoriteToggle: () async {
+                          final success =
+                              await recipeProvider.toggleFavorite(recipe.id);
+                          if (!success && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('로그인이 필요한 기능입니다.'),
+                                action: SnackBarAction(
+                                  label: '로그인',
+                                  onPressed: () async {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) => const AuthScreen()),
+                                    );
+                                    if (context.mounted &&
+                                        context
+                                            .read<AuthProvider>()
+                                            .isAuthenticated) {
+                                      context
+                                          .read<RecipeProvider>()
+                                          .onUserLogin();
+                                    }
+                                  },
+                                ),
+                              ),
+                            );
+                          }
+                        },
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(

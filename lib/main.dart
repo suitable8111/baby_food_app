@@ -1,9 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'services/firebase_service.dart';
 import 'providers/recipe_provider.dart';
+import 'providers/auth_provider.dart';
 import 'screens/home_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Firebase 초기화
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase 초기화 실패: $e');
+  }
+
   runApp(const BabyFoodApp());
 }
 
@@ -12,9 +27,23 @@ class BabyFoodApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // FirebaseService 인스턴스 생성
+    final firebaseService = FirebaseService();
+
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => RecipeProvider()),
+        // FirebaseService를 Provider로 제공
+        Provider<FirebaseService>.value(value: firebaseService),
+
+        // AuthProvider
+        ChangeNotifierProvider<AuthProvider>(
+          create: (_) => AuthProvider(firebaseService),
+        ),
+
+        // RecipeProvider - FirebaseService 주입
+        ChangeNotifierProvider<RecipeProvider>(
+          create: (_) => RecipeProvider(firebaseService),
+        ),
       ],
       child: MaterialApp(
         title: '이유식 분석',

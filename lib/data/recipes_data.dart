@@ -1,6 +1,5 @@
 import '../models/ingredient.dart';
 import '../models/recipe.dart';
-import 'ingredients_data.dart';
 
 /// 기본 레시피 데이터
 final List<Recipe> defaultRecipes = [
@@ -9,11 +8,8 @@ final List<Recipe> defaultRecipes = [
     id: 'rice_porridge',
     name: '쌀미음',
     stage: BabyFoodStage.early,
-    ingredients: [
-      RecipeIngredient(
-        ingredient: findIngredientById('rice')!,
-        amount: 10,
-      ),
+    ingredientData: [
+      RecipeIngredientData(ingredientId: 'rice', amount: 10),
     ],
     steps: [
       '쌀을 깨끗이 씻어 30분 이상 불린다.',
@@ -32,15 +28,9 @@ final List<Recipe> defaultRecipes = [
     id: 'carrot_rice_porridge',
     name: '당근 쌀미음',
     stage: BabyFoodStage.early,
-    ingredients: [
-      RecipeIngredient(
-        ingredient: findIngredientById('rice')!,
-        amount: 10,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('carrot')!,
-        amount: 15,
-      ),
+    ingredientData: [
+      RecipeIngredientData(ingredientId: 'rice', amount: 10),
+      RecipeIngredientData(ingredientId: 'carrot', amount: 15),
     ],
     steps: [
       '쌀을 깨끗이 씻어 30분 이상 불린다.',
@@ -60,11 +50,8 @@ final List<Recipe> defaultRecipes = [
     id: 'sweet_potato_puree',
     name: '고구마 퓌레',
     stage: BabyFoodStage.early,
-    ingredients: [
-      RecipeIngredient(
-        ingredient: findIngredientById('sweet_potato')!,
-        amount: 50,
-      ),
+    ingredientData: [
+      RecipeIngredientData(ingredientId: 'sweet_potato', amount: 50),
     ],
     steps: [
       '고구마를 깨끗이 씻어 껍질째 찐다.',
@@ -83,15 +70,9 @@ final List<Recipe> defaultRecipes = [
     id: 'potato_puree',
     name: '감자 퓌레',
     stage: BabyFoodStage.early,
-    ingredients: [
-      RecipeIngredient(
-        ingredient: findIngredientById('potato')!,
-        amount: 50,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('olive_oil')!,
-        amount: 2,
-      ),
+    ingredientData: [
+      RecipeIngredientData(ingredientId: 'potato', amount: 50),
+      RecipeIngredientData(ingredientId: 'olive_oil', amount: 2),
     ],
     steps: [
       '감자를 깨끗이 씻어 껍질을 벗긴다.',
@@ -110,11 +91,8 @@ final List<Recipe> defaultRecipes = [
     id: 'apple_puree',
     name: '사과 퓌레',
     stage: BabyFoodStage.early,
-    ingredients: [
-      RecipeIngredient(
-        ingredient: findIngredientById('apple')!,
-        amount: 50,
-      ),
+    ingredientData: [
+      RecipeIngredientData(ingredientId: 'apple', amount: 50),
     ],
     steps: [
       '사과를 깨끗이 씻어 껍질을 벗긴다.',
@@ -133,11 +111,8 @@ final List<Recipe> defaultRecipes = [
     id: 'banana_puree',
     name: '바나나 퓌레',
     stage: BabyFoodStage.early,
-    ingredients: [
-      RecipeIngredient(
-        ingredient: findIngredientById('banana')!,
-        amount: 40,
-      ),
+    ingredientData: [
+      RecipeIngredientData(ingredientId: 'banana', amount: 40),
     ],
     steps: [
       '잘 익은 바나나 껍질을 벗긴다.',
@@ -155,23 +130,11 @@ final List<Recipe> defaultRecipes = [
     id: 'vegetable_chicken_porridge',
     name: '닭고기 야채죽',
     stage: BabyFoodStage.middle,
-    ingredients: [
-      RecipeIngredient(
-        ingredient: findIngredientById('rice')!,
-        amount: 30,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('chicken_breast')!,
-        amount: 20,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('carrot')!,
-        amount: 15,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('zucchini')!,
-        amount: 15,
-      ),
+    ingredientData: [
+      RecipeIngredientData(ingredientId: 'rice', amount: 30),
+      RecipeIngredientData(ingredientId: 'chicken_breast', amount: 20),
+      RecipeIngredientData(ingredientId: 'carrot', amount: 15),
+      RecipeIngredientData(ingredientId: 'zucchini', amount: 15),
     ],
     steps: [
       '쌀을 씻어 30분 불린 후 믹서에 굵게 간다.',
@@ -192,19 +155,10 @@ final List<Recipe> defaultRecipes = [
     id: 'beef_spinach_porridge',
     name: '소고기 시금치죽',
     stage: BabyFoodStage.middle,
-    ingredients: [
-      RecipeIngredient(
-        ingredient: findIngredientById('rice')!,
-        amount: 30,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('beef')!,
-        amount: 20,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('spinach')!,
-        amount: 20,
-      ),
+    ingredientData: [
+      RecipeIngredientData(ingredientId: 'rice', amount: 30),
+      RecipeIngredientData(ingredientId: 'beef', amount: 20),
+      RecipeIngredientData(ingredientId: 'spinach', amount: 20),
     ],
     steps: [
       '쌀을 씻어 불린 후 굵게 간다.',
@@ -224,23 +178,11 @@ final List<Recipe> defaultRecipes = [
     id: 'tofu_vegetable_porridge',
     name: '두부 야채죽',
     stage: BabyFoodStage.middle,
-    ingredients: [
-      RecipeIngredient(
-        ingredient: findIngredientById('rice')!,
-        amount: 30,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('tofu')!,
-        amount: 30,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('broccoli')!,
-        amount: 20,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('carrot')!,
-        amount: 15,
-      ),
+    ingredientData: [
+      RecipeIngredientData(ingredientId: 'rice', amount: 30),
+      RecipeIngredientData(ingredientId: 'tofu', amount: 30),
+      RecipeIngredientData(ingredientId: 'broccoli', amount: 20),
+      RecipeIngredientData(ingredientId: 'carrot', amount: 15),
     ],
     steps: [
       '쌀을 불려 굵게 간다.',
@@ -260,19 +202,10 @@ final List<Recipe> defaultRecipes = [
     id: 'egg_yolk_porridge',
     name: '달걀 노른자죽',
     stage: BabyFoodStage.middle,
-    ingredients: [
-      RecipeIngredient(
-        ingredient: findIngredientById('rice')!,
-        amount: 30,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('egg_yolk')!,
-        amount: 15, // 약 1개 노른자
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('carrot')!,
-        amount: 10,
-      ),
+    ingredientData: [
+      RecipeIngredientData(ingredientId: 'rice', amount: 30),
+      RecipeIngredientData(ingredientId: 'egg_yolk', amount: 15), // 약 1개 노른자
+      RecipeIngredientData(ingredientId: 'carrot', amount: 10),
     ],
     steps: [
       '달걀을 완숙으로 삶아 노른자만 분리한다.',
@@ -292,27 +225,12 @@ final List<Recipe> defaultRecipes = [
     id: 'salmon_vegetable_rice',
     name: '연어 야채 진밥',
     stage: BabyFoodStage.late,
-    ingredients: [
-      RecipeIngredient(
-        ingredient: findIngredientById('rice')!,
-        amount: 50,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('salmon')!,
-        amount: 30,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('broccoli')!,
-        amount: 20,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('carrot')!,
-        amount: 15,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('olive_oil')!,
-        amount: 3,
-      ),
+    ingredientData: [
+      RecipeIngredientData(ingredientId: 'rice', amount: 50),
+      RecipeIngredientData(ingredientId: 'salmon', amount: 30),
+      RecipeIngredientData(ingredientId: 'broccoli', amount: 20),
+      RecipeIngredientData(ingredientId: 'carrot', amount: 15),
+      RecipeIngredientData(ingredientId: 'olive_oil', amount: 3),
     ],
     steps: [
       '쌀로 진밥을 짓는다.',
@@ -332,23 +250,11 @@ final List<Recipe> defaultRecipes = [
     id: 'beef_pumpkin_rice',
     name: '소고기 단호박 진밥',
     stage: BabyFoodStage.late,
-    ingredients: [
-      RecipeIngredient(
-        ingredient: findIngredientById('rice')!,
-        amount: 50,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('beef')!,
-        amount: 30,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('pumpkin')!,
-        amount: 40,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('spinach')!,
-        amount: 15,
-      ),
+    ingredientData: [
+      RecipeIngredientData(ingredientId: 'rice', amount: 50),
+      RecipeIngredientData(ingredientId: 'beef', amount: 30),
+      RecipeIngredientData(ingredientId: 'pumpkin', amount: 40),
+      RecipeIngredientData(ingredientId: 'spinach', amount: 15),
     ],
     steps: [
       '쌀로 진밥을 짓는다.',
@@ -367,23 +273,11 @@ final List<Recipe> defaultRecipes = [
     id: 'cheese_vegetable_oatmeal',
     name: '치즈 야채 오트밀',
     stage: BabyFoodStage.late,
-    ingredients: [
-      RecipeIngredient(
-        ingredient: findIngredientById('oatmeal')!,
-        amount: 30,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('cheese')!,
-        amount: 10,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('broccoli')!,
-        amount: 20,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('carrot')!,
-        amount: 15,
-      ),
+    ingredientData: [
+      RecipeIngredientData(ingredientId: 'oatmeal', amount: 30),
+      RecipeIngredientData(ingredientId: 'cheese', amount: 10),
+      RecipeIngredientData(ingredientId: 'broccoli', amount: 20),
+      RecipeIngredientData(ingredientId: 'carrot', amount: 15),
     ],
     steps: [
       '오트밀을 물 또는 우유와 함께 끓인다.',
@@ -402,19 +296,10 @@ final List<Recipe> defaultRecipes = [
     id: 'yogurt_fruit_bowl',
     name: '요거트 과일 볼',
     stage: BabyFoodStage.late,
-    ingredients: [
-      RecipeIngredient(
-        ingredient: findIngredientById('yogurt')!,
-        amount: 80,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('banana')!,
-        amount: 30,
-      ),
-      RecipeIngredient(
-        ingredient: findIngredientById('apple')!,
-        amount: 20,
-      ),
+    ingredientData: [
+      RecipeIngredientData(ingredientId: 'yogurt', amount: 80),
+      RecipeIngredientData(ingredientId: 'banana', amount: 30),
+      RecipeIngredientData(ingredientId: 'apple', amount: 20),
     ],
     steps: [
       '바나나를 작은 조각으로 자른다.',

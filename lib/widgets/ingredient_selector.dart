@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/ingredient.dart';
-import '../models/nutrition.dart';
 
 /// 재료 선택 항목 타일
 class IngredientTile extends StatelessWidget {

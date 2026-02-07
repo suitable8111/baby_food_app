@@ -1,6 +1,11 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/recipe.dart';
 import '../models/ingredient.dart';
+import '../providers/recipe_provider.dart';
+import '../services/image_service.dart';
 
 /// 레시피 카드 위젯
 class RecipeCard extends StatelessWidget {
@@ -19,6 +24,10 @@ class RecipeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final recipeProvider = context.watch<RecipeProvider>();
+    final hasAllergens = recipeProvider.recipeHasAllergens(recipe);
+    final nutrition = recipeProvider.getRecipeNutrition(recipe);
+
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -26,19 +35,16 @@ class RecipeCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 이미지 영역 (플레이스홀더)
+            // 이미지 영역
             Container(
               height: 120,
               width: double.infinity,
               color: _getStageColor(recipe.stage).withOpacity(0.2),
               child: Stack(
                 children: [
-                  Center(
-                    child: Icon(
-                      Icons.restaurant,
-                      size: 48,
-                      color: _getStageColor(recipe.stage),
-                    ),
+                  // 레시피 이미지 (없으면 아이콘 플레이스홀더)
+                  Positioned.fill(
+                    child: _buildRecipeImage(),
                   ),
                   // 단계 뱃지
                   Positioned(
@@ -73,7 +79,7 @@ class RecipeCard extends StatelessWidget {
                     ),
                   ),
                   // 알레르기 경고
-                  if (recipe.hasAllergens)
+                  if (hasAllergens)
                     Positioned(
                       bottom: 8,
                       right: 8,
@@ -130,7 +136,7 @@ class RecipeCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   // 영양소 요약
                   Text(
-                    '${recipe.totalNutrition.calories.toStringAsFixed(0)} kcal',
+                    '${nutrition.calories.toStringAsFixed(0)} kcal',
                     style: TextStyle(
                       color: Colors.grey.shade600,
                       fontSize: 12,
@@ -165,6 +171,47 @@ class RecipeCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRecipeImage() {
+    final imageService = ImageService();
+
+    // 1. 사용자 레시피의 로컬 이미지가 있으면 표시
+    if (recipe.imageUrl != null && imageService.isLocalFile(recipe.imageUrl)) {
+      if (!kIsWeb) {
+        return Image.file(
+          File(recipe.imageUrl!),
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildAssetOrPlaceholder(),
+        );
+      }
+    }
+
+    // 2. 네트워크 이미지 URL이 있으면 표시
+    if (recipe.imageUrl != null && recipe.imageUrl!.startsWith('http')) {
+      return Image.network(
+        recipe.imageUrl!,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _buildAssetOrPlaceholder(),
+      );
+    }
+
+    // 3. 기본 레시피는 asset 이미지 또는 플레이스홀더
+    return _buildAssetOrPlaceholder();
+  }
+
+  Widget _buildAssetOrPlaceholder() {
+    return Image.asset(
+      'assets/images/recipes/${recipe.name}.png',
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => Center(
+        child: Icon(
+          Icons.restaurant,
+          size: 48,
+          color: _getStageColor(recipe.stage),
+        ),
       ),
     );
   }

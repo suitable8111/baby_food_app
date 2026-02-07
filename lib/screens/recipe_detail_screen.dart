@@ -1,9 +1,15 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/recipe.dart';
 import '../models/ingredient.dart';
 import '../providers/recipe_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/nutrition_chart.dart';
+import '../services/image_service.dart';
+import 'recipe_edit_screen.dart';
+import 'auth_screen.dart';
 
 class RecipeDetailScreen extends StatelessWidget {
   final Recipe recipe;
@@ -17,6 +23,9 @@ class RecipeDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final recipeProvider = context.watch<RecipeProvider>();
     final isFavorite = recipeProvider.isFavorite(recipe.id);
+    final nutrition = recipeProvider.getRecipeNutrition(recipe);
+    final hasAllergens = recipeProvider.recipeHasAllergens(recipe);
+    final allergens = recipeProvider.getRecipeAllergens(recipe);
 
     return Scaffold(
       body: CustomScrollView(
@@ -32,16 +41,7 @@ class RecipeDetailScreen extends StatelessWidget {
                   shadows: [Shadow(blurRadius: 4, color: Colors.black54)],
                 ),
               ),
-              background: Container(
-                color: _getStageColor(recipe.stage).withOpacity(0.3),
-                child: Center(
-                  child: Icon(
-                    Icons.restaurant,
-                    size: 80,
-                    color: _getStageColor(recipe.stage),
-                  ),
-                ),
-              ),
+              background: _buildBackgroundImage(),
             ),
             actions: [
               IconButton(
@@ -49,8 +49,27 @@ class RecipeDetailScreen extends StatelessWidget {
                   isFavorite ? Icons.favorite : Icons.favorite_border,
                   color: isFavorite ? Colors.red : Colors.white,
                 ),
-                onPressed: () => recipeProvider.toggleFavorite(recipe.id),
+                onPressed: () async {
+                  final success =
+                      await recipeProvider.toggleFavorite(recipe.id);
+                  if (!success && context.mounted) {
+                    _showLoginRequired(context);
+                  }
+                },
               ),
+              // 사용자 레시피인 경우 편집 버튼
+              if (recipe.userId != null)
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RecipeEditScreen(recipe: recipe),
+                      ),
+                    );
+                  },
+                ),
             ],
           ),
 
@@ -62,12 +81,12 @@ class RecipeDetailScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 기본 정보
-                  _buildInfoRow(context),
+                  _buildInfoRow(context, nutrition),
                   const SizedBox(height: 24),
 
                   // 알레르기 경고
-                  if (recipe.hasAllergens) ...[
-                    _buildAllergenWarning(context),
+                  if (hasAllergens) ...[
+                    _buildAllergenWarning(context, allergens),
                     const SizedBox(height: 24),
                   ],
 
@@ -76,7 +95,7 @@ class RecipeDetailScreen extends StatelessWidget {
                     context,
                     title: '재료',
                     icon: Icons.shopping_basket,
-                    child: _buildIngredientsList(context),
+                    child: _buildIngredientsList(context, recipeProvider),
                   ),
                   const SizedBox(height: 24),
 
@@ -87,10 +106,10 @@ class RecipeDetailScreen extends StatelessWidget {
                     icon: Icons.pie_chart,
                     child: Column(
                       children: [
-                        NutritionPieChart(nutrition: recipe.totalNutrition),
+                        NutritionPieChart(nutrition: nutrition),
                         const SizedBox(height: 16),
                         NutritionInfoCard(
-                          nutrition: recipe.totalNutrition,
+                          nutrition: nutrition,
                           title: '총 영양소',
                         ),
                       ],
@@ -118,6 +137,34 @@ class RecipeDetailScreen extends StatelessWidget {
                     _buildStorageInfo(context),
                   ],
 
+                  const SizedBox(height: 24),
+
+                  // 나만의 레시피로 저장 버튼 (기본 레시피인 경우)
+                  if (recipe.userId == null)
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          final authProvider = context.read<AuthProvider>();
+                          if (!authProvider.isAuthenticated) {
+                            _showLoginRequired(context);
+                            return;
+                          }
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => RecipeEditScreen(recipe: recipe),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.edit_note),
+                        label: const Text('나만의 레시피로 저장'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+
                   const SizedBox(height: 32),
                 ],
               ),
@@ -128,8 +175,10 @@ class RecipeDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(BuildContext context) {
-    return Row(
+  Widget _buildInfoRow(BuildContext context, nutrition) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
       children: [
         _buildInfoChip(
           context,
@@ -137,25 +186,22 @@ class RecipeDetailScreen extends StatelessWidget {
           recipe.stage.shortName,
           _getStageColor(recipe.stage),
         ),
-        const SizedBox(width: 8),
         _buildInfoChip(
           context,
           Icons.timer,
           '${recipe.cookingTimeMinutes}분',
           Colors.blue,
         ),
-        const SizedBox(width: 8),
         _buildInfoChip(
           context,
           Icons.signal_cellular_alt,
           recipe.difficulty.displayName,
           Colors.orange,
         ),
-        const SizedBox(width: 8),
         _buildInfoChip(
           context,
           Icons.local_fire_department,
-          '${recipe.totalNutrition.calories.toStringAsFixed(0)} kcal',
+          '${nutrition.calories.toStringAsFixed(0)} kcal',
           Colors.red,
         ),
       ],
@@ -187,7 +233,7 @@ class RecipeDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAllergenWarning(BuildContext context) {
+  Widget _buildAllergenWarning(BuildContext context, List<Ingredient> allergens) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -211,7 +257,7 @@ class RecipeDetailScreen extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '포함 재료: ${recipe.allergens.map((a) => a.allergenType ?? a.name).join(', ')}',
+                  '포함 재료: ${allergens.map((a) => a.allergenType ?? a.name).join(', ')}',
                   style: TextStyle(
                     color: Colors.orange.shade700,
                     fontSize: 12,
@@ -251,27 +297,36 @@ class RecipeDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildIngredientsList(BuildContext context) {
+  Widget _buildIngredientsList(BuildContext context, RecipeProvider recipeProvider) {
     return Card(
       child: ListView.separated(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        itemCount: recipe.ingredients.length,
+        itemCount: recipe.ingredientData.length,
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (context, index) {
-          final item = recipe.ingredients[index];
+          final data = recipe.ingredientData[index];
+          final ingredient = recipeProvider.getIngredientById(data.ingredientId);
+
+          if (ingredient == null) {
+            return ListTile(
+              title: Text('알 수 없는 재료: ${data.ingredientId}'),
+              trailing: Text('${data.amount.toStringAsFixed(0)}${data.unit}'),
+            );
+          }
+
           return ListTile(
             leading: CircleAvatar(
-              backgroundColor: _getCategoryColor(item.ingredient.category).withOpacity(0.2),
+              backgroundColor: _getCategoryColor(ingredient.category).withOpacity(0.2),
               child: Icon(
-                _getCategoryIcon(item.ingredient.category),
-                color: _getCategoryColor(item.ingredient.category),
+                _getCategoryIcon(ingredient.category),
+                color: _getCategoryColor(ingredient.category),
                 size: 20,
               ),
             ),
-            title: Text(item.ingredient.name),
+            title: Text(ingredient.name),
             trailing: Text(
-              '${item.amount.toStringAsFixed(0)}${item.unit}',
+              '${data.amount.toStringAsFixed(0)}${data.unit}',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           );
@@ -392,6 +447,71 @@ class RecipeDetailScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBackgroundImage() {
+    final imageService = ImageService();
+
+    // 1. 사용자 레시피의 로컬 이미지가 있으면 표시
+    if (recipe.imageUrl != null && imageService.isLocalFile(recipe.imageUrl)) {
+      if (!kIsWeb) {
+        return Image.file(
+          File(recipe.imageUrl!),
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildAssetOrPlaceholder(),
+        );
+      }
+    }
+
+    // 2. 네트워크 이미지 URL이 있으면 표시
+    if (recipe.imageUrl != null && recipe.imageUrl!.startsWith('http')) {
+      return Image.network(
+        recipe.imageUrl!,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _buildAssetOrPlaceholder(),
+      );
+    }
+
+    // 3. 기본 레시피는 asset 이미지 또는 플레이스홀더
+    return _buildAssetOrPlaceholder();
+  }
+
+  Widget _buildAssetOrPlaceholder() {
+    return Image.asset(
+      'assets/images/recipes/${recipe.name}.png',
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => Container(
+        color: _getStageColor(recipe.stage).withOpacity(0.3),
+        child: Center(
+          child: Icon(
+            Icons.restaurant,
+            size: 80,
+            color: _getStageColor(recipe.stage),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showLoginRequired(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('로그인이 필요한 기능입니다.'),
+        action: SnackBarAction(
+          label: '로그인',
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AuthScreen()),
+            );
+            if (context.mounted &&
+                context.read<AuthProvider>().isAuthenticated) {
+              context.read<RecipeProvider>().onUserLogin();
+            }
+          },
+        ),
       ),
     );
   }

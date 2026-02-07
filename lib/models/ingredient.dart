@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'nutrition.dart';
 
 /// 이유식 단계
@@ -65,11 +66,11 @@ class Ingredient {
   final String id;
   final String name;
   final IngredientCategory category;
-  final Nutrition nutritionPer100g; // 100g당 영양소
-  final List<BabyFoodStage> availableStages; // 사용 가능 단계
-  final bool isAllergen; // 알레르기 유발 여부
-  final String? allergenType; // 알레르기 종류 (예: 우유, 계란, 밀)
-  final String? description; // 설명
+  final Nutrition nutritionPer100g;
+  final List<BabyFoodStage> availableStages;
+  final bool isAllergen;
+  final String? allergenType;
+  final String? description;
 
   const Ingredient({
     required this.id,
@@ -107,25 +108,32 @@ class Ingredient {
 
   factory Ingredient.fromJson(Map<String, dynamic> json) {
     return Ingredient(
-      id: json['id'],
-      name: json['name'],
-      category: IngredientCategory.values[json['category']],
-      nutritionPer100g: Nutrition.fromJson(json['nutritionPer100g']),
-      availableStages: (json['availableStages'] as List)
-          .map((i) => BabyFoodStage.values[i])
-          .toList(),
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      category: IngredientCategory.values[json['category'] ?? 0],
+      nutritionPer100g: Nutrition.fromJson(json['nutritionPer100g'] ?? {}),
+      availableStages: (json['availableStages'] as List<dynamic>?)
+              ?.map((i) => BabyFoodStage.values[i as int])
+              .toList() ??
+          [],
       isAllergen: json['isAllergen'] ?? false,
       allergenType: json['allergenType'],
       description: json['description'],
     );
   }
+
+  /// Firestore 문서에서 변환
+  factory Ingredient.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return Ingredient.fromJson({...data, 'id': doc.id});
+  }
 }
 
-/// 레시피에서 사용되는 재료 (양 포함)
+/// 레시피에서 사용되는 재료 (양 포함) - UI 표시용
 class RecipeIngredient {
   final Ingredient ingredient;
-  final double amount; // 그램
-  final String? unit; // 단위 (g, ml 등)
+  final double amount;
+  final String? unit;
 
   const RecipeIngredient({
     required this.ingredient,
@@ -133,10 +141,8 @@ class RecipeIngredient {
     this.unit = 'g',
   });
 
-  /// 이 재료의 영양소 계산
   Nutrition get nutrition => ingredient.getNutritionForGrams(amount);
 
-  /// 양 변경된 새 인스턴스 반환
   RecipeIngredient copyWith({double? amount}) {
     return RecipeIngredient(
       ingredient: ingredient,
