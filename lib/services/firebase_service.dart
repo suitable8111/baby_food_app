@@ -386,7 +386,7 @@ class FirebaseService {
     return docRef.id;
   }
 
-  /// 날짜 범위로 일지 조회
+  /// 날짜 범위로 일지 조회 (composite index 회피: userId만 쿼리, 날짜는 Dart에서 필터)
   Future<List<FoodDiaryEntry>> getDiaryEntries(
     String userId,
     DateTime start,
@@ -394,11 +394,10 @@ class FirebaseService {
   ) async {
     final snapshot = await _foodDiaryRef
         .where('userId', isEqualTo: userId)
-        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-        .where('date', isLessThan: Timestamp.fromDate(end))
         .get();
     final list = snapshot.docs
         .map((doc) => FoodDiaryEntry.fromFirestore(doc))
+        .where((e) => !e.date.isBefore(start) && e.date.isBefore(end))
         .toList();
     list.sort((a, b) => a.mealTime.compareTo(b.mealTime));
     return list;
