@@ -62,3 +62,23 @@ custom_recipes/
 google-services.json
 GoogleService-Info.plist
 firebase_options.dart
+
+# iOS/macOS Environment (dev_ios branch - 로컬 환경 보호)
+# CocoaPods
+ios/Podfile
+ios/Podfile.lock
+ios/Pods/
+macos/Podfile
+macos/Podfile.lock
+macos/Pods/
+
+# iOS Xcode config (CocoaPods include 등 로컬 환경 설정)
+ios/Flutter/Debug.xcconfig
+ios/Flutter/Release.xcconfig
+ios/Runner.xcodeproj/project.pbxproj
+ios/Runner.xcworkspace/contents.xcworkspacedata
+
+# macOS Flutter config
+macos/Flutter/Flutter-Debug.xcconfig
+macos/Flutter/Flutter-Release.xcconfig
+macos/Flutter/GeneratedPluginRegistrant.swift
