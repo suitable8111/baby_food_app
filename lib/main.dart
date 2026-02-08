@@ -6,6 +6,7 @@ import 'firebase_options.dart';
 import 'services/firebase_service.dart';
 import 'providers/recipe_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/diary_provider.dart';
 import 'screens/home_screen.dart';
 
 void main() async {
@@ -28,22 +29,22 @@ class BabyFoodApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // FirebaseService 인스턴스 생성
     final firebaseService = FirebaseService();
+
+    // 브랜드 컬러
+    const seedColor = Color(0xFF6BBF59); // 부드러운 그린
 
     return MultiProvider(
       providers: [
-        // FirebaseService를 Provider로 제공
         Provider<FirebaseService>.value(value: firebaseService),
-
-        // AuthProvider
         ChangeNotifierProvider<AuthProvider>(
           create: (_) => AuthProvider(firebaseService),
         ),
-
-        // RecipeProvider - FirebaseService 주입
         ChangeNotifierProvider<RecipeProvider>(
           create: (_) => RecipeProvider(firebaseService),
+        ),
+        ChangeNotifierProvider<DiaryProvider>(
+          create: (_) => DiaryProvider(firebaseService),
         ),
       ],
       child: MaterialApp(
@@ -61,39 +62,97 @@ class BabyFoodApp extends StatelessWidget {
         locale: const Locale('ko', 'KR'),
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.green,
+            seedColor: seedColor,
             brightness: Brightness.light,
           ),
           useMaterial3: true,
           fontFamily: 'Pretendard',
+          scaffoldBackgroundColor: const Color(0xFFF8FAF6),
           appBarTheme: const AppBarTheme(
-            centerTitle: true,
+            centerTitle: false,
             elevation: 0,
+            scrolledUnderElevation: 0.5,
+            backgroundColor: Colors.transparent,
+            titleTextStyle: TextStyle(
+              fontFamily: 'Pretendard',
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1A1A1A),
+            ),
           ),
           cardTheme: CardThemeData(
-            elevation: 2,
+            elevation: 0,
+            color: Colors.white,
+            surfaceTintColor: Colors.transparent,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
             ),
           ),
           inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: Colors.white,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: seedColor, width: 1.5),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
-              vertical: 12,
+              vertical: 14,
             ),
           ),
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
+              elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
               ),
               padding: const EdgeInsets.symmetric(
                 horizontal: 24,
-                vertical: 12,
+                vertical: 14,
               ),
+            ),
+          ),
+          filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 14,
+              ),
+            ),
+          ),
+          floatingActionButtonTheme: const FloatingActionButtonThemeData(
+            elevation: 2,
+            highlightElevation: 4,
+          ),
+          dividerTheme: DividerThemeData(
+            color: Colors.grey.shade100,
+            thickness: 1,
+          ),
+          bottomSheetTheme: const BottomSheetThemeData(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+          ),
+          dialogTheme: DialogThemeData(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+          snackBarTheme: SnackBarThemeData(
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
         ),

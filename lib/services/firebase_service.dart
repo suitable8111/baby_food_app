@@ -5,6 +5,7 @@ import '../models/recipe.dart';
 import '../models/shared_recipe.dart';
 import '../models/board_recipe.dart';
 import '../models/user_profile.dart';
+import '../models/food_diary_entry.dart';
 
 /// Firebase 서비스 클래스
 /// Firestore 데이터 CRUD 및 인증 관리
@@ -18,6 +19,7 @@ class FirebaseService {
   CollectionReference get _usersRef => _firestore.collection('users');
   CollectionReference get _sharedRecipesRef => _firestore.collection('shared_recipes');
   CollectionReference get _boardRecipesRef => _firestore.collection('board_recipes');
+  CollectionReference get _foodDiaryRef => _firestore.collection('food_diary');
 
   // 현재 사용자
   User? get currentUser => _auth.currentUser;
@@ -371,5 +373,44 @@ class FirebaseService {
   /// 게시판 레시피 삭제
   Future<void> deleteBoardRecipe(String boardId) async {
     await _boardRecipesRef.doc(boardId).delete();
+  }
+
+  // ==================== 이유식 일지 ====================
+
+  /// 일지 엔트리 추가
+  Future<String> addDiaryEntry(FoodDiaryEntry entry) async {
+    final docRef = await _foodDiaryRef.add({
+      ...entry.toJson(),
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return docRef.id;
+  }
+
+  /// 날짜 범위로 일지 조회
+  Future<List<FoodDiaryEntry>> getDiaryEntries(
+    String userId,
+    DateTime start,
+    DateTime end,
+  ) async {
+    final snapshot = await _foodDiaryRef
+        .where('userId', isEqualTo: userId)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('date', isLessThan: Timestamp.fromDate(end))
+        .get();
+    final list = snapshot.docs
+        .map((doc) => FoodDiaryEntry.fromFirestore(doc))
+        .toList();
+    list.sort((a, b) => a.mealTime.compareTo(b.mealTime));
+    return list;
+  }
+
+  /// 일지 엔트리 수정
+  Future<void> updateDiaryEntry(String entryId, Map<String, dynamic> data) async {
+    await _foodDiaryRef.doc(entryId).update(data);
+  }
+
+  /// 일지 엔트리 삭제
+  Future<void> deleteDiaryEntry(String entryId) async {
+    await _foodDiaryRef.doc(entryId).delete();
   }
 }

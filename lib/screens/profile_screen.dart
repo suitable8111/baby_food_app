@@ -54,27 +54,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final source = await showModalBottomSheet<String>(
       context: context,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('갤러리에서 선택'),
-              onTap: () => Navigator.pop(context, 'gallery'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('카메라로 촬영'),
-              onTap: () => Navigator.pop(context, 'camera'),
-            ),
-            if (_babyPhotoPath != null)
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title:
-                    const Text('사진 삭제', style: TextStyle(color: Colors.red)),
-                onTap: () => Navigator.pop(context, 'delete'),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-          ],
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF66BB6A).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.photo_library_rounded,
+                      color: Color(0xFF66BB6A)),
+                ),
+                title: const Text('갤러리에서 선택'),
+                onTap: () => Navigator.pop(context, 'gallery'),
+              ),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF42A5F5).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded,
+                      color: Color(0xFF42A5F5)),
+                ),
+                title: const Text('카메라로 촬영'),
+                onTap: () => Navigator.pop(context, 'camera'),
+              ),
+              if (_babyPhotoPath != null)
+                ListTile(
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE57373).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.delete_rounded,
+                        color: Color(0xFFE57373)),
+                  ),
+                  title: const Text('사진 삭제',
+                      style: TextStyle(color: Color(0xFFE57373))),
+                  onTap: () => Navigator.pop(context, 'delete'),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -170,11 +209,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Color _getStageColor(BabyFoodStage stage) {
     switch (stage) {
       case BabyFoodStage.early:
-        return Colors.green;
+        return const Color(0xFF66BB6A);
       case BabyFoodStage.middle:
-        return Colors.orange;
+        return const Color(0xFFFFA726);
       case BabyFoodStage.late:
-        return Colors.purple;
+        return const Color(0xFF7E57C2);
     }
   }
 
@@ -186,112 +225,161 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         title: const Text('내 프로필'),
         actions: [
-          TextButton(
-            onPressed: _isSaving ? null : _saveProfile,
-            child: _isSaving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('저장'),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilledButton(
+              onPressed: _isSaving ? null : _saveProfile,
+              style: FilledButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child:
+                          CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('저장', style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 아기 사진
-              GestureDetector(
-                onTap: _pickPhoto,
-                child: Stack(
+              // 프로필 사진 카드
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
                   children: [
-                    CircleAvatar(
-                      radius: 60,
-                      backgroundColor: Colors.grey.shade200,
-                      backgroundImage: _buildPhotoImage(),
-                      child: _babyPhotoPath == null
-                          ? Icon(Icons.child_care,
-                              size: 60, color: Colors.grey.shade400)
-                          : null,
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.camera_alt,
-                          size: 20,
-                          color: Colors.white,
-                        ),
+                    GestureDetector(
+                      onTap: _pickPhoto,
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFFF0F4EE),
+                              border: Border.all(
+                                  color: const Color(0xFFE0E8DC), width: 3),
+                              image: _buildPhotoDecoration(),
+                            ),
+                            child: _babyPhotoPath == null
+                                ? const Icon(Icons.child_care_rounded,
+                                    size: 48, color: Color(0xFFB0C4A8))
+                                : null,
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFF66BB6A),
+                                    Color(0xFF43A047)
+                                  ],
+                                ),
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: const Icon(Icons.camera_alt_rounded,
+                                  size: 16, color: Colors.white),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    Text(
+                      authProvider.userEmail ?? '',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                    // 이유식 단계 표시
+                    if (_babyBirthDate != null) ...[
+                      const SizedBox(height: 16),
+                      _buildStageInfo(),
+                    ],
                   ],
                 ),
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
 
-              // 이유식 단계 표시
-              if (_babyBirthDate != null) ...[
-                _buildStageInfo(),
-                const SizedBox(height: 24),
-              ],
-
-              // 계정 이메일 (읽기 전용)
-              TextFormField(
-                initialValue: authProvider.userEmail ?? '',
-                decoration: const InputDecoration(
-                  labelText: '계정 이메일',
-                  prefixIcon: Icon(Icons.email),
-                  filled: true,
+              // 정보 입력 카드
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                readOnly: true,
-                enabled: false,
-              ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '기본 정보',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF2D2D2D),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
 
-              const SizedBox(height: 16),
+                    // 별칭
+                    TextFormField(
+                      controller: _nicknameController,
+                      decoration: const InputDecoration(
+                        labelText: '별칭 (닉네임)',
+                        hintText: '표시할 이름을 입력하세요',
+                        prefixIcon:
+                            Icon(Icons.person_rounded, color: Color(0xFF66BB6A)),
+                      ),
+                    ),
 
-              // 별칭
-              TextFormField(
-                controller: _nicknameController,
-                decoration: const InputDecoration(
-                  labelText: '별칭 (닉네임)',
-                  hintText: '표시할 이름을 입력하세요',
-                  prefixIcon: Icon(Icons.person),
+                    const SizedBox(height: 14),
+
+                    // 아기 이름
+                    TextFormField(
+                      controller: _babyNameController,
+                      decoration: const InputDecoration(
+                        labelText: '아기 이름',
+                        hintText: '아기 이름을 입력하세요',
+                        prefixIcon: Icon(Icons.child_care_rounded,
+                            color: Color(0xFFFFA726)),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // 아기 성별
+                    _buildGenderSelector(),
+
+                    const SizedBox(height: 20),
+
+                    // 아기 생년월일
+                    _buildBirthDateSelector(),
+                  ],
                 ),
               ),
-
-              const SizedBox(height: 16),
-
-              // 아기 이름
-              TextFormField(
-                controller: _babyNameController,
-                decoration: const InputDecoration(
-                  labelText: '아기 이름',
-                  hintText: '아기 이름을 입력하세요',
-                  prefixIcon: Icon(Icons.child_care),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // 아기 성별
-              _buildGenderSelector(),
-
-              const SizedBox(height: 16),
-
-              // 아기 생년월일
-              _buildBirthDateSelector(),
             ],
           ),
         ),
@@ -299,14 +387,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  ImageProvider? _buildPhotoImage() {
+  DecorationImage? _buildPhotoDecoration() {
     if (_babyPhotoPath == null) return null;
     if (!kIsWeb && ImageService().isLocalFile(_babyPhotoPath!)) {
       final file = File(_babyPhotoPath!);
-      if (file.existsSync()) return FileImage(file);
+      if (file.existsSync()) {
+        return DecorationImage(image: FileImage(file), fit: BoxFit.cover);
+      }
     }
     if (_babyPhotoPath!.startsWith('http')) {
-      return NetworkImage(_babyPhotoPath!);
+      return DecorationImage(
+          image: NetworkImage(_babyPhotoPath!), fit: BoxFit.cover);
     }
     return null;
   }
@@ -329,35 +420,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        gradient: LinearGradient(
+          colors: [color.withValues(alpha: 0.1), color.withValues(alpha: 0.05)],
+        ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.cake, color: color, size: 22),
+          Icon(Icons.cake_rounded, color: color, size: 20),
           const SizedBox(width: 8),
           Text(
             ageText,
             style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: color),
+                fontSize: 15, fontWeight: FontWeight.w700, color: color),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: color,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
               '이유식 ${stage.shortName}',
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -370,36 +462,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 12, bottom: 8),
-          child: Text(
-            '아기 성별',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade600,
-            ),
-          ),
+        Text(
+          '아기 성별',
+          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
         ),
-        SegmentedButton<BabyGender?>(
-          segments: const [
-            ButtonSegment(
-              value: BabyGender.male,
-              label: Text('남아'),
-              icon: Icon(Icons.boy),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _GenderOption(
+                icon: Icons.boy_rounded,
+                label: '남아',
+                color: const Color(0xFF42A5F5),
+                isSelected: _babyGender == BabyGender.male,
+                onTap: () => setState(() => _babyGender =
+                    _babyGender == BabyGender.male ? null : BabyGender.male),
+              ),
             ),
-            ButtonSegment(
-              value: BabyGender.female,
-              label: Text('여아'),
-              icon: Icon(Icons.girl),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _GenderOption(
+                icon: Icons.girl_rounded,
+                label: '여아',
+                color: const Color(0xFFEC407A),
+                isSelected: _babyGender == BabyGender.female,
+                onTap: () => setState(() => _babyGender =
+                    _babyGender == BabyGender.female
+                        ? null
+                        : BabyGender.female),
+              ),
             ),
           ],
-          selected: _babyGender != null ? {_babyGender} : {},
-          emptySelectionAllowed: true,
-          onSelectionChanged: (selected) {
-            setState(() {
-              _babyGender = selected.isEmpty ? null : selected.first;
-            });
-          },
         ),
       ],
     );
@@ -408,21 +501,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildBirthDateSelector() {
     return InkWell(
       onTap: _pickBirthDate,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       child: InputDecorator(
         decoration: const InputDecoration(
           labelText: '아기 생년월일',
-          prefixIcon: Icon(Icons.calendar_today),
-          suffixIcon: Icon(Icons.arrow_drop_down),
+          prefixIcon:
+              Icon(Icons.calendar_today_rounded, color: Color(0xFF7E57C2)),
+          suffixIcon: Icon(Icons.arrow_drop_down_rounded),
         ),
         child: Text(
           _babyBirthDate != null
               ? '${_babyBirthDate!.year}년 ${_babyBirthDate!.month}월 ${_babyBirthDate!.day}일'
               : '생년월일을 선택하세요',
           style: TextStyle(
-            color:
-                _babyBirthDate != null ? null : Colors.grey.shade500,
-            fontSize: 16,
+            color: _babyBirthDate != null
+                ? const Color(0xFF2D2D2D)
+                : Colors.grey.shade400,
+            fontSize: 15,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GenderOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _GenderOption({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: isSelected ? color.withValues(alpha: 0.1) : const Color(0xFFF8F8F8),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected ? color : Colors.grey.shade200,
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: isSelected ? color : Colors.grey.shade400, size: 22),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? color : Colors.grey.shade500,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 14,
+                ),
+              ),
+            ],
           ),
         ),
       ),
