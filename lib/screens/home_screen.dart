@@ -11,6 +11,7 @@ import 'recipe_list_screen.dart';
 import 'recipe_detail_screen.dart';
 import 'nutrition_calculator_screen.dart';
 import 'auth_screen.dart';
+import 'auth_wrapper.dart';
 import 'favorites_screen.dart';
 import 'my_recipes_screen.dart';
 import 'shared_recipes_screen.dart';
@@ -275,8 +276,10 @@ class HomeScreen extends StatelessWidget {
                       await authProvider.signOut();
                       if (context.mounted) {
                         context.read<RecipeProvider>().onUserLogout();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('로그아웃되었습니다.')),
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                              builder: (_) => const AuthWrapper()),
+                          (route) => false,
                         );
                       }
                     },
@@ -286,14 +289,13 @@ class HomeScreen extends StatelessWidget {
                     icon: Icons.login_rounded,
                     label: '로그인',
                     iconColor: Theme.of(context).colorScheme.primary,
-                    onTap: () async {
+                    onTap: () {
                       Navigator.pop(context);
-                      await Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const AuthScreen()));
-                      if (context.mounted &&
-                          context.read<AuthProvider>().isAuthenticated) {
-                        context.read<RecipeProvider>().onUserLogin();
-                      }
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                            builder: (_) => const AuthWrapper()),
+                        (route) => false,
+                      );
                     },
                   ),
               ],

@@ -1007,17 +1007,9 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     if (!sheetContext.mounted) return;
     Navigator.pop(sheetContext);
 
-    if (!mounted) return;
-    if (success) {
+    if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('\'${recipe.name}\' 기록이 추가되었습니다')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('저장에 실패했습니다. 다시 시도해 주세요.'),
-          backgroundColor: Color(0xFFE57373),
-        ),
       );
     }
   }

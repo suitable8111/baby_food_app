@@ -147,6 +147,39 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Google 로그인
+  Future<bool> signInWithGoogle() async {
+    try {
+      _status = AuthStatus.loading;
+      _errorMessage = null;
+      notifyListeners();
+
+      await _firebaseService.signInWithGoogle();
+
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      return true;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'google-sign-in-cancelled') {
+        // 사용자가 취소한 경우 조용히 원래 상태로 복귀
+        _status = _user != null
+            ? AuthStatus.authenticated
+            : AuthStatus.unauthenticated;
+        notifyListeners();
+        return false;
+      }
+      _status = AuthStatus.error;
+      _errorMessage = _getErrorMessage(e.code);
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _status = AuthStatus.error;
+      _errorMessage = 'Google 로그인 중 오류가 발생했습니다.';
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// 로그아웃
   Future<void> signOut() async {
     try {
@@ -205,6 +238,10 @@ class AuthProvider extends ChangeNotifier {
         return '이 작업은 허용되지 않습니다.';
       case 'invalid-credential':
         return '이메일 또는 비밀번호가 올바르지 않습니다.';
+      case 'account-exists-with-different-credential':
+        return '이미 동일한 이메일로 가입된 계정이 있습니다. 기존 로그인 방식을 사용해주세요.';
+      case 'google-sign-in-cancelled':
+        return '';
       default:
         return '오류가 발생했습니다. ($code)';
     }

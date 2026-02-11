@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../models/ingredient.dart';
 import '../models/recipe.dart';
 import '../models/shared_recipe.dart';
@@ -12,6 +13,7 @@ import '../models/food_diary_entry.dart';
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // 컬렉션 참조
   CollectionReference get _ingredientsRef => _firestore.collection('ingredients');
@@ -67,8 +69,41 @@ class FirebaseService {
     );
   }
 
+  /// Google 로그인
+  Future<UserCredential> signInWithGoogle() async {
+    final googleUser = await _googleSignIn.signIn();
+    if (googleUser == null) {
+      throw FirebaseAuthException(
+        code: 'google-sign-in-cancelled',
+        message: '구글 로그인이 취소되었습니다.',
+      );
+    }
+
+    final googleAuth = await googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    final userCredential = await _auth.signInWithCredential(credential);
+
+    // 첫 로그인 시 Firestore 사용자 문서 생성 (기존 문서가 있으면 유지)
+    final userDoc = await _usersRef.doc(userCredential.user!.uid).get();
+    if (!userDoc.exists) {
+      await _usersRef.doc(userCredential.user!.uid).set({
+        'email': userCredential.user!.email,
+        'displayName': userCredential.user!.displayName,
+        'createdAt': FieldValue.serverTimestamp(),
+        'favoriteRecipes': [],
+      });
+    }
+
+    return userCredential;
+  }
+
   /// 로그아웃
   Future<void> signOut() async {
+    await _googleSignIn.signOut();
     await _auth.signOut();
   }
 
@@ -386,7 +421,7 @@ class FirebaseService {
     return docRef.id;
   }
 
-  /// 날짜 범위로 일지 조회 (composite index 회피: userId만 쿼리, 날짜는 Dart에서 필터)
+  /// 날짜 범위로 일지 조회
   Future<List<FoodDiaryEntry>> getDiaryEntries(
     String userId,
     DateTime start,
@@ -394,10 +429,11 @@ class FirebaseService {
   ) async {
     final snapshot = await _foodDiaryRef
         .where('userId', isEqualTo: userId)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('date', isLessThan: Timestamp.fromDate(end))
         .get();
     final list = snapshot.docs
         .map((doc) => FoodDiaryEntry.fromFirestore(doc))
-        .where((e) => !e.date.isBefore(start) && e.date.isBefore(end))
         .toList();
     list.sort((a, b) => a.mealTime.compareTo(b.mealTime));
     return list;
