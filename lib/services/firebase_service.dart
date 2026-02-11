@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../models/ingredient.dart';
 import '../models/recipe.dart';
 import '../models/shared_recipe.dart';
@@ -12,6 +13,7 @@ import '../models/food_diary_entry.dart';
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // 컬렉션 참조
   CollectionReference get _ingredientsRef => _firestore.collection('ingredients');
@@ -67,8 +69,41 @@ class FirebaseService {
     );
   }
 
+  /// Google 로그인
+  Future<UserCredential> signInWithGoogle() async {
+    final googleUser = await _googleSignIn.signIn();
+    if (googleUser == null) {
+      throw FirebaseAuthException(
+        code: 'google-sign-in-cancelled',
+        message: '구글 로그인이 취소되었습니다.',
+      );
+    }
+
+    final googleAuth = await googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    final userCredential = await _auth.signInWithCredential(credential);
+
+    // 첫 로그인 시 Firestore 사용자 문서 생성 (기존 문서가 있으면 유지)
+    final userDoc = await _usersRef.doc(userCredential.user!.uid).get();
+    if (!userDoc.exists) {
+      await _usersRef.doc(userCredential.user!.uid).set({
+        'email': userCredential.user!.email,
+        'displayName': userCredential.user!.displayName,
+        'createdAt': FieldValue.serverTimestamp(),
+        'favoriteRecipes': [],
+      });
+    }
+
+    return userCredential;
+  }
+
   /// 로그아웃
   Future<void> signOut() async {
+    await _googleSignIn.signOut();
     await _auth.signOut();
   }
 

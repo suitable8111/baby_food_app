@@ -7,7 +7,7 @@ import 'services/firebase_service.dart';
 import 'providers/recipe_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/diary_provider.dart';
-import 'screens/home_screen.dart';
+import 'screens/auth_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -156,7 +156,7 @@ class BabyFoodApp extends StatelessWidget {
             ),
           ),
         ),
-        home: const HomeScreen(),
+        home: const AuthWrapper(),
       ),
     );
   }
