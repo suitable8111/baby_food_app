@@ -1,16 +1,121 @@
-# baby_food_app
+# 동백이 밥창고 (Baby Food App)
 
-A new Flutter project.
+우리 아기 이유식 레시피 & 영양 관리 앱
 
-## Getting Started
+## 현재 기능
 
-This project is a starting point for a Flutter application.
+### 레시피
+- 단계별(초기/중기/후기) 기본 레시피 14종 제공
+- 나만의 레시피 생성/수정/삭제 (사진, 재료, 조리 과정)
+- 즐겨찾기
+- 1:1 레시피 공유 (이메일 기반)
+- 모두의 레시피함 (커뮤니티 게시판)
 
-A few resources to get you started if this is your first Flutter project:
+### 영양소
+- 커스텀 재료 조합 영양소 계산기
+- 월령별 일일 권장량 대비 비교 차트
+- 알레르기 식재료 경고
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+### 이유식 일지
+- 캘린더 기반 일별 기록
+- 이유식 / 분유 / 모유 기록
+- 일일 영양소 섭취 차트
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### 프로필
+- 아기 이름, 생년월일, 성별, 사진
+- 월령 기반 자동 단계 판별
+
+---
+
+## 추가 기능 로드맵
+
+### 1. 부부간 이유식 일지 연동 (Couple Sync)
+> 엄마/아빠가 같은 아기의 이유식 일지를 실시간 공유
+
+- 초대 코드 또는 이메일로 파트너 연결
+- 동일 아기 프로필을 양쪽 계정에서 공유
+- 일지 작성 시 작성자 표시 (엄마/아빠 아이콘)
+- 상대방이 기록하면 실시간 반영
+- 구현: Firestore `families` 컬렉션 → 가족 그룹 ID로 diary 쿼리
+
+### 2. 일지 수정 기능
+> 현재 삭제 후 재등록만 가능 → 직접 수정 지원
+
+- `DiaryProvider.updateEntry()` 구현 (FirebaseService에는 이미 `updateDiaryEntry` 존재)
+- 수정 시 기존 데이터 프리필
+- 수유량, 메모, 시간 등 개별 필드 수정 가능
+
+### 3. 주간/월간 영양 트렌드
+> 하루 단위 → 주간/월간 영양 섭취 추이 확인
+
+- 7일 평균 영양소 차트
+- 월간 섭취 패턴 히트맵
+- 부족 영양소 알림
+
+### 4. 새 식재료 도입 추적
+> "3일 간격 새 식재료 1개씩" 원칙 관리
+
+- 식재료 첫 도입일 기록
+- 알레르기 반응 메모 (발진, 구토 등)
+- 다음 새 식재료 도입 가능일 안내
+- 도입 완료 식재료 목록 (안심 재료 리스트)
+
+### 5. 아기 성장 기록
+> 체중/신장 로깅 + 성장 곡선
+
+- 월별 체중/키 입력
+- WHO 성장 곡선 퍼센타일 차트
+- 성장 추이 그래프
+
+### 6. 푸시 알림 (FCM)
+> 레시피 공유 수신, 일지 미작성 리마인더
+
+- 레시피 공유 도착 시 푸시 알림
+- 저녁 시간 일지 미작성 리마인더
+- 파트너 일지 작성 시 알림 (부부 연동 연계)
+
+### 7. 이미지 클라우드 동기화
+> 현재 로컬 저장 → Firebase Storage 연동
+
+- 레시피 사진 클라우드 업로드/다운로드
+- 아기 프로필 사진 동기화
+- 게시판 레시피에 실제 이미지 표시 (현재 로컬 경로라 타 사용자에게 안 보임)
+
+### 8. 게시판 기능 강화
+> 커뮤니티 활성화를 위한 기능
+
+- 레시피 좋아요 / 댓글
+- 카테고리/태그 필터
+- 검색 기능
+- 인기순/최신순 정렬
+
+### 9. 실제 섭취량 기록
+> 만든 양 vs 실제 먹은 양 구분
+
+- 레시피 1회 분량 설정
+- 일지 기록 시 실제 섭취 비율 (%) 또는 그램 입력
+- 실제 섭취 기반 영양소 계산
+
+### 10. 오프라인 지원
+> sqflite 의존성은 이미 존재 → 실제 구현 필요
+
+- 로컬 DB 캐싱으로 오프라인 레시피 열람
+- 오프라인 일지 작성 → 온라인 복귀 시 자동 동기화
+- 네트워크 상태 감지 및 UI 표시
+
+---
+
+## 기술 스택
+- Flutter (Material 3)
+- Firebase Auth + Cloud Firestore
+- Provider (상태 관리)
+- fl_chart (차트)
+- table_calendar (캘린더)
+- image_picker + path_provider (이미지)
+
+## 기술 부채
+- `go_router` 선언만 되어 있고 미사용 (imperative Navigator 사용 중)
+- `sqflite` 선언만 되어 있고 미구현
+- Firestore diary 쿼리에 날짜 범위 인덱스 없음 (전체 fetch 후 클라이언트 필터)
+- 관리자 이메일 하드코딩 (`isAdmin` 체크)
+- `NutritionChangeIndicator` 위젯 정의만 있고 미사용

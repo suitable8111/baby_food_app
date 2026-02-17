@@ -18,6 +18,7 @@ import 'shared_recipes_screen.dart';
 import 'board_screen.dart';
 import 'profile_screen.dart';
 import 'food_diary_screen.dart';
+import 'family_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -127,6 +128,18 @@ class HomeScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
               children: [
+                // 섹션 1: 일반
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, top: 12, bottom: 4),
+                  child: Text(
+                    '일반',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
                 _DrawerMenuItem(
                   icon: Icons.home_rounded,
                   label: '홈',
@@ -153,21 +166,17 @@ class HomeScreen extends StatelessWidget {
                   },
                 ),
 
+                // 섹션 2: 내 정보
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                  child: Divider(color: Colors.grey.shade200, height: 1),
-                ),
-
-                _DrawerMenuItem(
-                  icon: Icons.favorite_rounded,
-                  label: '즐겨찾기',
-                  iconColor: const Color(0xFFE57373),
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (!isLoggedIn) { _showLoginRequired(context); return; }
-                    Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const FavoritesScreen()));
-                  },
+                  padding: const EdgeInsets.only(left: 16, top: 12, bottom: 4),
+                  child: Text(
+                    '내 정보',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
                 _DrawerMenuItem(
                   icon: Icons.person_rounded,
@@ -178,6 +187,17 @@ class HomeScreen extends StatelessWidget {
                     if (!isLoggedIn) { _showLoginRequired(context); return; }
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const ProfileScreen()));
+                  },
+                ),
+                _DrawerMenuItem(
+                  icon: Icons.favorite_rounded,
+                  label: '즐겨찾는 레시피',
+                  iconColor: const Color(0xFFE57373),
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (!isLoggedIn) { _showLoginRequired(context); return; }
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const FavoritesScreen()));
                   },
                 ),
                 _DrawerMenuItem(
@@ -203,51 +223,32 @@ class HomeScreen extends StatelessWidget {
                   },
                 ),
                 _DrawerMenuItem(
-                  icon: Icons.mail_rounded,
-                  label: '레시피 공유함',
-                  iconColor: const Color(0xFF26A69A),
-                  trailing: isLoggedIn
-                      ? Consumer<RecipeProvider>(
-                          builder: (context, provider, _) {
-                            final count = provider.pendingShareCount;
-                            if (count == 0) return const SizedBox.shrink();
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE57373),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                '$count',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            );
-                          },
-                        )
-                      : null,
+                  icon: Icons.people_rounded,
+                  label: '가족 연동',
+                  iconColor: const Color(0xFFEC407A),
                   onTap: () {
                     Navigator.pop(context);
                     if (!isLoggedIn) { _showLoginRequired(context); return; }
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const SharedRecipesScreen()));
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const FamilyScreen()));
                   },
                 ),
 
+                // 섹션 3: 공유 게시판
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                  child: Divider(color: Colors.grey.shade200, height: 1),
+                  padding: const EdgeInsets.only(left: 16, top: 12, bottom: 4),
+                  child: Text(
+                    '공유 게시판',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-
                 _DrawerMenuItem(
                   icon: Icons.forum_rounded,
-                  label: '레시피 게시판',
+                  label: '모두의 레시피함',
                   iconColor: const Color(0xFF7E57C2),
                   onTap: () {
                     Navigator.pop(context);
@@ -382,6 +383,36 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('동백이 밥창고'),
+        actions: [
+          Consumer<RecipeProvider>(
+            builder: (context, recipeProvider, _) {
+              final count = authProvider.isAuthenticated
+                  ? recipeProvider.pendingShareCount
+                  : 0;
+              return IconButton(
+                icon: Badge(
+                  isLabelVisible: count > 0,
+                  label: Text(
+                    '$count',
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                  child: const Icon(Icons.notifications_rounded),
+                ),
+                onPressed: () {
+                  if (!authProvider.isAuthenticated) {
+                    _showLoginRequired(context);
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const SharedRecipesScreen()),
+                  );
+                },
+              );
+            },
+          ),
+        ],
       ),
       drawer: _buildDrawer(context),
       body: SingleChildScrollView(
@@ -527,14 +558,12 @@ class _DrawerMenuItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color? iconColor;
-  final Widget? trailing;
   final VoidCallback onTap;
 
   const _DrawerMenuItem({
     required this.icon,
     required this.label,
     this.iconColor,
-    this.trailing,
     required this.onTap,
   });
 
@@ -557,7 +586,6 @@ class _DrawerMenuItem extends StatelessWidget {
           label,
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
         ),
-        trailing: trailing,
         onTap: onTap,
       ),
     );

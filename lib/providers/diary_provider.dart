@@ -29,8 +29,8 @@ class DiaryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 해당 월 데이터 로드
-  Future<void> loadEntries(String userId, DateTime month) async {
+  /// 해당 월 데이터 로드 (familyId 기준)
+  Future<void> loadEntries(String familyId, DateTime month) async {
     _isLoading = true;
     notifyListeners();
 
@@ -38,7 +38,7 @@ class DiaryProvider extends ChangeNotifier {
       final start = DateTime(month.year, month.month, 1);
       final end = DateTime(month.year, month.month + 1, 1);
 
-      final list = await _firebaseService.getDiaryEntries(userId, start, end);
+      final list = await _firebaseService.getDiaryEntries(familyId, start, end);
 
       // 날짜별 그룹핑
       _entries.clear();
@@ -69,6 +69,7 @@ class DiaryProvider extends ChangeNotifier {
 
     Nutrition total = Nutrition.empty;
     for (final entry in dayEntries) {
+      if (entry.isMilkEntry) continue;
       total = total + entry.nutrition;
     }
     return total;

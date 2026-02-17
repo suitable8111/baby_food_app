@@ -6,6 +6,7 @@ import '../models/user_profile.dart';
 import '../models/ingredient.dart';
 import '../providers/auth_provider.dart';
 import '../services/image_service.dart';
+import 'family_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -173,6 +174,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       babyBirthDate: _babyBirthDate,
       babyGender: _babyGender,
       babyPhotoPath: _babyPhotoPath,
+      familyId: currentProfile?.familyId,
+      partnerUserId: currentProfile?.partnerUserId,
       createdAt: currentProfile?.createdAt,
     );
 
@@ -323,6 +326,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 16),
 
+              // 가족 연동 상태 카드
+              _buildFamilyCard(authProvider),
+
+              const SizedBox(height: 16),
+
               // 정보 입력 카드
               Container(
                 width: double.infinity,
@@ -400,6 +408,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
           image: NetworkImage(_babyPhotoPath!), fit: BoxFit.cover);
     }
     return null;
+  }
+
+  Widget _buildFamilyCard(AuthProvider authProvider) {
+    final hasPartner = authProvider.hasPartner;
+    final partner = authProvider.partnerProfile;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const FamilyScreen()),
+          );
+        },
+        borderRadius: BorderRadius.circular(20),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: hasPartner
+                    ? const Color(0xFFEC407A).withValues(alpha: 0.12)
+                    : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                hasPartner ? Icons.favorite_rounded : Icons.people_outline_rounded,
+                color: hasPartner ? const Color(0xFFEC407A) : Colors.grey.shade400,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '가족 연동',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF2D2D2D),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    hasPartner
+                        ? '${partner?.nickname ?? partner?.email ?? "파트너"}와 연동됨'
+                        : '파트너를 초대하세요',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: Colors.grey.shade300),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildStageInfo() {

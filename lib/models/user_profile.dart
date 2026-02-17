@@ -22,6 +22,8 @@ class UserProfile {
   final DateTime? babyBirthDate;
   final BabyGender? babyGender;
   final String? babyPhotoPath;
+  final String? familyId;
+  final String? partnerUserId;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -33,6 +35,8 @@ class UserProfile {
     this.babyBirthDate,
     this.babyGender,
     this.babyPhotoPath,
+    this.familyId,
+    this.partnerUserId,
     this.createdAt,
     this.updatedAt,
   });
@@ -68,6 +72,9 @@ class UserProfile {
     return '$years세 $remainMonths개월';
   }
 
+  /// 유효 familyId (없으면 본인 userId 폴백)
+  String get effectiveFamilyId => familyId ?? userId;
+
   UserProfile copyWith({
     String? userId,
     String? email,
@@ -76,6 +83,8 @@ class UserProfile {
     DateTime? babyBirthDate,
     BabyGender? babyGender,
     String? babyPhotoPath,
+    String? familyId,
+    String? partnerUserId,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -87,6 +96,8 @@ class UserProfile {
       babyBirthDate: babyBirthDate ?? this.babyBirthDate,
       babyGender: babyGender ?? this.babyGender,
       babyPhotoPath: babyPhotoPath ?? this.babyPhotoPath,
+      familyId: familyId ?? this.familyId,
+      partnerUserId: partnerUserId ?? this.partnerUserId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -101,6 +112,8 @@ class UserProfile {
         'babyBirthDate': Timestamp.fromDate(babyBirthDate!),
       if (babyGender != null) 'babyGender': babyGender!.name,
       'babyPhotoPath': babyPhotoPath,
+      if (familyId != null) 'familyId': familyId,
+      if (partnerUserId != null) 'partnerUserId': partnerUserId,
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }
@@ -120,6 +133,8 @@ class UserProfile {
             )
           : null,
       babyPhotoPath: data['babyPhotoPath'],
+      familyId: data['familyId'],
+      partnerUserId: data['partnerUserId'],
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
     );

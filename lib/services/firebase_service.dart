@@ -7,6 +7,7 @@ import '../models/shared_recipe.dart';
 import '../models/board_recipe.dart';
 import '../models/user_profile.dart';
 import '../models/food_diary_entry.dart';
+import '../models/family_invite.dart';
 
 /// Firebase 서비스 클래스
 /// Firestore 데이터 CRUD 및 인증 관리
@@ -22,6 +23,7 @@ class FirebaseService {
   CollectionReference get _sharedRecipesRef => _firestore.collection('shared_recipes');
   CollectionReference get _boardRecipesRef => _firestore.collection('board_recipes');
   CollectionReference get _foodDiaryRef => _firestore.collection('food_diary');
+  CollectionReference get _familyInvitesRef => _firestore.collection('family_invites');
 
   // 현재 사용자
   User? get currentUser => _auth.currentUser;
@@ -421,16 +423,39 @@ class FirebaseService {
     return docRef.id;
   }
 
-  /// 날짜 범위로 일지 조회 (composite index 회피: userId만 쿼리, 날짜는 Dart에서 필터)
+  /// 날짜 범위로 일지 조회 (familyId 기준 + 본인 레거시 폴백)
   Future<List<FoodDiaryEntry>> getDiaryEntries(
-    String userId,
+    String familyId,
     DateTime start,
     DateTime end,
   ) async {
+    // 1) familyId 기준 — 연동된 양쪽 모든 기록
     final snapshot = await _foodDiaryRef
-        .where('userId', isEqualTo: userId)
+        .where('familyId', isEqualTo: familyId)
         .get();
-    final list = snapshot.docs
+
+    // 2) 레거시 폴백: 본인의 옛 문서(familyId 필드 없음)만 추가 조회
+    //    반드시 본인 uid로만 조회해야 Firestore 규칙 통과
+    final uid = currentUserId;
+    QuerySnapshot? legacySnapshot;
+    if (uid != null) {
+      legacySnapshot = await _foodDiaryRef
+          .where('userId', isEqualTo: uid)
+          .get();
+    }
+
+    // 중복 제거 (id 기준)
+    final docMap = <String, DocumentSnapshot>{};
+    for (final doc in snapshot.docs) {
+      docMap[doc.id] = doc;
+    }
+    if (legacySnapshot != null) {
+      for (final doc in legacySnapshot.docs) {
+        docMap[doc.id] = doc;
+      }
+    }
+
+    final list = docMap.values
         .map((doc) => FoodDiaryEntry.fromFirestore(doc))
         .where((e) => !e.date.isBefore(start) && e.date.isBefore(end))
         .toList();
@@ -446,5 +471,159 @@ class FirebaseService {
   /// 일지 엔트리 삭제
   Future<void> deleteDiaryEntry(String entryId) async {
     await _foodDiaryRef.doc(entryId).delete();
+  }
+
+  // ==================== 가족 연동 ====================
+
+  /// 가족 초대 보내기
+  Future<String> sendFamilyInvite({
+    required String receiverEmail,
+    String? senderNickname,
+  }) async {
+    final docRef = await _familyInvitesRef.add({
+      'senderUserId': currentUserId,
+      'senderEmail': currentUser?.email,
+      'senderNickname': senderNickname,
+      'receiverEmail': receiverEmail,
+      'status': InviteStatus.pending.name,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return docRef.id;
+  }
+
+  /// 받은 초대 목록 (pending만, 복합 인덱스 불필요하도록 클라이언트 필터)
+  Future<List<FamilyInvite>> getPendingFamilyInvites(String email) async {
+    final snapshot = await _familyInvitesRef
+        .where('receiverEmail', isEqualTo: email)
+        .get();
+    final list = snapshot.docs
+        .map((doc) => FamilyInvite.fromFirestore(doc))
+        .where((invite) => invite.status == InviteStatus.pending)
+        .toList();
+    list.sort((a, b) => (b.createdAt ?? DateTime(2000)).compareTo(a.createdAt ?? DateTime(2000)));
+    return list;
+  }
+
+  /// 보낸 초대 목록
+  Future<List<FamilyInvite>> getSentFamilyInvites(String userId) async {
+    final snapshot = await _familyInvitesRef
+        .where('senderUserId', isEqualTo: userId)
+        .get();
+    final list = snapshot.docs.map((doc) => FamilyInvite.fromFirestore(doc)).toList();
+    list.sort((a, b) => (b.createdAt ?? DateTime(2000)).compareTo(a.createdAt ?? DateTime(2000)));
+    return list;
+  }
+
+  /// 초대 수락 → 양쪽 familyId/partnerUserId 설정 + 기존 diary 마이그레이션
+  Future<void> acceptFamilyInvite(String inviteId) async {
+    final inviteDoc = await _familyInvitesRef.doc(inviteId).get();
+    if (!inviteDoc.exists) return;
+
+    final data = inviteDoc.data() as Map<String, dynamic>;
+    final senderUserId = data['senderUserId'] as String;
+
+    // 수신자 uid 조회 (이메일 기준)
+    final receiverEmail = data['receiverEmail'] as String;
+    final receiverSnapshot = await _usersRef
+        .where('email', isEqualTo: receiverEmail)
+        .limit(1)
+        .get();
+    if (receiverSnapshot.docs.isEmpty) return;
+    final receiverUserId = receiverSnapshot.docs.first.id;
+
+    // sender의 familyId를 기준으로 (이미 있으면 재사용, 없으면 sender uid)
+    final senderDoc = await _usersRef.doc(senderUserId).get();
+    final senderData = senderDoc.data() as Map<String, dynamic>? ?? {};
+    final familyId = senderData['familyId'] ?? senderUserId;
+
+    final batch = _firestore.batch();
+
+    // 초대 상태 업데이트
+    batch.update(_familyInvitesRef.doc(inviteId), {
+      'status': InviteStatus.accepted.name,
+    });
+
+    // 양쪽 프로필 업데이트
+    batch.set(_usersRef.doc(senderUserId), {
+      'familyId': familyId,
+      'partnerUserId': receiverUserId,
+    }, SetOptions(merge: true));
+
+    batch.set(_usersRef.doc(receiverUserId), {
+      'familyId': familyId,
+      'partnerUserId': senderUserId,
+    }, SetOptions(merge: true));
+
+    await batch.commit();
+
+    // 양쪽의 기존 diary 문서에 familyId 일괄 세팅
+    await _migrateDiaryFamilyId(senderUserId, familyId);
+    await _migrateDiaryFamilyId(receiverUserId, familyId);
+  }
+
+  /// 특정 사용자의 모든 diary 문서에 familyId를 세팅
+  Future<void> _migrateDiaryFamilyId(String userId, String familyId) async {
+    final snapshot = await _foodDiaryRef
+        .where('userId', isEqualTo: userId)
+        .get();
+
+    if (snapshot.docs.isEmpty) return;
+
+    // batch는 500개 제한이 있으므로 나눠서 처리
+    final chunks = <List<DocumentSnapshot>>[];
+    for (var i = 0; i < snapshot.docs.length; i += 400) {
+      chunks.add(snapshot.docs.sublist(
+        i,
+        i + 400 > snapshot.docs.length ? snapshot.docs.length : i + 400,
+      ));
+    }
+
+    for (final chunk in chunks) {
+      final batch = _firestore.batch();
+      for (final doc in chunk) {
+        batch.update(doc.reference, {'familyId': familyId});
+      }
+      await batch.commit();
+    }
+  }
+
+  /// 초대 거절
+  Future<void> declineFamilyInvite(String inviteId) async {
+    await _familyInvitesRef.doc(inviteId).update({
+      'status': InviteStatus.declined.name,
+    });
+  }
+
+  /// 가족 연동 해제 → 양쪽 familyId를 각자 uid로 복원 + diary 복원
+  Future<void> unlinkFamily(String userId) async {
+    final userDoc = await _usersRef.doc(userId).get();
+    if (!userDoc.exists) return;
+
+    final data = userDoc.data() as Map<String, dynamic>? ?? {};
+    final partnerUserId = data['partnerUserId'] as String?;
+
+    final batch = _firestore.batch();
+
+    // 본인 복원
+    batch.update(_usersRef.doc(userId), {
+      'familyId': userId,
+      'partnerUserId': FieldValue.delete(),
+    });
+
+    // 파트너 복원
+    if (partnerUserId != null) {
+      batch.update(_usersRef.doc(partnerUserId), {
+        'familyId': partnerUserId,
+        'partnerUserId': FieldValue.delete(),
+      });
+    }
+
+    await batch.commit();
+
+    // 양쪽 diary를 각자 userId로 복원
+    await _migrateDiaryFamilyId(userId, userId);
+    if (partnerUserId != null) {
+      await _migrateDiaryFamilyId(partnerUserId, partnerUserId);
+    }
   }
 }

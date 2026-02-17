@@ -20,6 +20,7 @@ class AuthProvider extends ChangeNotifier {
   User? _user;
   String? _errorMessage;
   UserProfile? _userProfile;
+  UserProfile? _partnerProfile;
 
   AuthProvider(this._firebaseService) {
     // 인증 상태 변화 구독
@@ -37,6 +38,9 @@ class AuthProvider extends ChangeNotifier {
   String? get displayName => _userProfile?.nickname ?? _user?.displayName;
   bool get isAdmin => _user?.email == 'suitable8111@gmail.com';
   UserProfile? get userProfile => _userProfile;
+  UserProfile? get partnerProfile => _partnerProfile;
+  String get familyId => _userProfile?.effectiveFamilyId ?? _user?.uid ?? '';
+  bool get hasPartner => _userProfile?.partnerUserId != null;
 
   /// 인증 상태 변화 핸들러
   void _onAuthStateChanged(User? user) async {
@@ -51,7 +55,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 사용자 프로필 로드
+  /// 사용자 프로필 로드 (파트너 프로필도 함께)
   Future<void> loadUserProfile() async {
     if (_user == null) return;
     try {
@@ -61,6 +65,13 @@ class AuthProvider extends ChangeNotifier {
         userId: _user!.uid,
         email: _user!.email ?? '',
       );
+      // 파트너 프로필 로드
+      final partnerId = _userProfile?.partnerUserId;
+      if (partnerId != null) {
+        _partnerProfile = await _firebaseService.getUserProfile(partnerId);
+      } else {
+        _partnerProfile = null;
+      }
       notifyListeners();
     } catch (e) {
       debugPrint('프로필 로드 실패: $e');
@@ -79,6 +90,32 @@ class AuthProvider extends ChangeNotifier {
       debugPrint('프로필 업데이트 실패: $e');
       _errorMessage = '프로필 저장에 실패했습니다.';
       notifyListeners();
+      return false;
+    }
+  }
+
+  /// 파트너 연동 (초대 수락)
+  Future<bool> linkPartner(String inviteId) async {
+    try {
+      await _firebaseService.acceptFamilyInvite(inviteId);
+      await loadUserProfile();
+      return true;
+    } catch (e) {
+      debugPrint('파트너 연동 실패: $e');
+      return false;
+    }
+  }
+
+  /// 파트너 연동 해제
+  Future<bool> unlinkPartner() async {
+    if (_user == null) return false;
+    try {
+      await _firebaseService.unlinkFamily(_user!.uid);
+      _partnerProfile = null;
+      await loadUserProfile();
+      return true;
+    } catch (e) {
+      debugPrint('연동 해제 실패: $e');
       return false;
     }
   }
@@ -187,6 +224,7 @@ class AuthProvider extends ChangeNotifier {
       _status = AuthStatus.unauthenticated;
       _user = null;
       _userProfile = null;
+      _partnerProfile = null;
       notifyListeners();
     } catch (e) {
       _errorMessage = '로그아웃 중 오류가 발생했습니다.';
