@@ -7,6 +7,7 @@ class BoardRecipe {
   final String authorUserId;
   final String authorEmail;
   final String? authorDisplayName;
+  final String? photoUrl;
   final DateTime? publishedAt;
   final DateTime? updatedAt;
 
@@ -16,6 +17,7 @@ class BoardRecipe {
     required this.authorUserId,
     required this.authorEmail,
     this.authorDisplayName,
+    this.photoUrl,
     this.publishedAt,
     this.updatedAt,
   });
@@ -30,6 +32,7 @@ class BoardRecipe {
       'authorUserId': authorUserId,
       'authorEmail': authorEmail,
       'authorDisplayName': authorDisplayName,
+      if (photoUrl != null) 'photoUrl': photoUrl,
       'publishedAt':
           publishedAt != null ? Timestamp.fromDate(publishedAt!) : null,
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
@@ -43,6 +46,7 @@ class BoardRecipe {
       authorUserId: json['authorUserId'] ?? '',
       authorEmail: json['authorEmail'] ?? '',
       authorDisplayName: json['authorDisplayName'],
+      photoUrl: json['photoUrl'],
       publishedAt: json['publishedAt'] != null
           ? (json['publishedAt'] as Timestamp).toDate()
           : null,

@@ -379,12 +379,13 @@ class FirebaseService {
   // ==================== 레시피 게시판 ====================
 
   /// 게시판에 레시피 게시
-  Future<String> publishToBoard(Recipe recipe) async {
+  Future<String> publishToBoard(Recipe recipe, {String? photoUrl}) async {
     final docRef = await _boardRecipesRef.add({
       'recipeData': recipe.toJson(),
       'authorUserId': currentUserId,
       'authorEmail': currentUser?.email,
       'authorDisplayName': currentUser?.displayName,
+      if (photoUrl != null) 'photoUrl': photoUrl,
       'publishedAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });

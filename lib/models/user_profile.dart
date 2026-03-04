@@ -22,6 +22,7 @@ class UserProfile {
   final DateTime? babyBirthDate;
   final BabyGender? babyGender;
   final String? babyPhotoPath;
+  final double? babyWeightKg;
   final String? familyId;
   final String? partnerUserId;
   final DateTime? createdAt;
@@ -35,6 +36,7 @@ class UserProfile {
     this.babyBirthDate,
     this.babyGender,
     this.babyPhotoPath,
+    this.babyWeightKg,
     this.familyId,
     this.partnerUserId,
     this.createdAt,
@@ -83,6 +85,7 @@ class UserProfile {
     DateTime? babyBirthDate,
     BabyGender? babyGender,
     String? babyPhotoPath,
+    double? babyWeightKg,
     String? familyId,
     String? partnerUserId,
     DateTime? createdAt,
@@ -96,6 +99,7 @@ class UserProfile {
       babyBirthDate: babyBirthDate ?? this.babyBirthDate,
       babyGender: babyGender ?? this.babyGender,
       babyPhotoPath: babyPhotoPath ?? this.babyPhotoPath,
+      babyWeightKg: babyWeightKg ?? this.babyWeightKg,
       familyId: familyId ?? this.familyId,
       partnerUserId: partnerUserId ?? this.partnerUserId,
       createdAt: createdAt ?? this.createdAt,
@@ -112,6 +116,7 @@ class UserProfile {
         'babyBirthDate': Timestamp.fromDate(babyBirthDate!),
       if (babyGender != null) 'babyGender': babyGender!.name,
       'babyPhotoPath': babyPhotoPath,
+      if (babyWeightKg != null) 'babyWeightKg': babyWeightKg,
       if (familyId != null) 'familyId': familyId,
       if (partnerUserId != null) 'partnerUserId': partnerUserId,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -133,6 +138,7 @@ class UserProfile {
             )
           : null,
       babyPhotoPath: data['babyPhotoPath'],
+      babyWeightKg: (data['babyWeightKg'] as num?)?.toDouble(),
       familyId: data['familyId'],
       partnerUserId: data['partnerUserId'],
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),

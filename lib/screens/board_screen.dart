@@ -186,7 +186,7 @@ class _BoardScreenState extends State<BoardScreen> {
     );
   }
 
-  Color _getStageColor(stage) {
+  Color _getStageColor(BabyFoodStage stage) {
     switch (stage.index) {
       case 0:
         return Colors.green;
@@ -235,14 +235,25 @@ class _BoardRecipeCard extends StatelessWidget {
               width: double.infinity,
               color: _getStageColor(recipe.stage).withOpacity(0.2),
               child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  Center(
-                    child: Icon(
-                      Icons.restaurant,
-                      size: 40,
-                      color: _getStageColor(recipe.stage),
+                  if (boardRecipe.photoUrl != null)
+                    Image.network(
+                      boardRecipe.photoUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (ctx, err, stack) => Center(
+                        child: Icon(Icons.restaurant,
+                            size: 40, color: _getStageColor(recipe.stage)),
+                      ),
+                    )
+                  else
+                    Center(
+                      child: Icon(
+                        Icons.restaurant,
+                        size: 40,
+                        color: _getStageColor(recipe.stage),
+                      ),
                     ),
-                  ),
                   // 단계 뱃지
                   Positioned(
                     top: 6,
@@ -398,7 +409,7 @@ class _BoardRecipeCard extends StatelessWidget {
     );
   }
 
-  Color _getStageColor(stage) {
+  Color _getStageColor(BabyFoodStage stage) {
     switch (stage.index) {
       case 0:
         return Colors.green;

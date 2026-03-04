@@ -19,11 +19,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nicknameController = TextEditingController();
   final _babyNameController = TextEditingController();
+  final _babyWeightController = TextEditingController();
 
   DateTime? _babyBirthDate;
   BabyGender? _babyGender;
   String? _babyPhotoPath;
   bool _isSaving = false;
+  bool _isUploadingPhoto = false;
 
   @override
   void initState() {
@@ -40,6 +42,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _babyBirthDate = profile.babyBirthDate;
       _babyGender = profile.babyGender;
       _babyPhotoPath = profile.babyPhotoPath;
+      if (profile.babyWeightKg != null) {
+        _babyWeightController.text = profile.babyWeightKg!.toString();
+      }
     }
   }
 
@@ -47,11 +52,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     _nicknameController.dispose();
     _babyNameController.dispose();
+    _babyWeightController.dispose();
     super.dispose();
   }
 
   Future<void> _pickPhoto() async {
     final imageService = ImageService();
+    final userId = context.read<AuthProvider>().userId;
     final source = await showModalBottomSheet<String>(
       context: context,
       builder: (context) => SafeArea(
@@ -130,11 +137,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ? await imageService.pickImageFromGallery()
         : await imageService.pickImageFromCamera();
 
-    if (xFile != null) {
-      final savedPath =
-          await imageService.saveRecipeImage(xFile, 'baby_profile');
-      if (savedPath != null) {
-        setState(() => _babyPhotoPath = savedPath);
+    if (xFile != null && userId != null) {
+      setState(() => _isUploadingPhoto = true);
+      final url = await imageService.uploadProfilePhoto(userId, xFile);
+      if (mounted) {
+        setState(() {
+          _isUploadingPhoto = false;
+          if (url != null) _babyPhotoPath = url;
+        });
       }
     }
   }
@@ -174,6 +184,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       babyBirthDate: _babyBirthDate,
       babyGender: _babyGender,
       babyPhotoPath: _babyPhotoPath,
+      babyWeightKg: double.tryParse(_babyWeightController.text.trim()),
       familyId: currentProfile?.familyId,
       partnerUserId: currentProfile?.partnerUserId,
       createdAt: currentProfile?.createdAt,
@@ -231,12 +242,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: FilledButton(
-              onPressed: _isSaving ? null : _saveProfile,
+              onPressed: _isSaving || _isUploadingPhoto ? null : _saveProfile,
               style: FilledButton.styleFrom(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               ),
-              child: _isSaving
+              child: _isSaving || _isUploadingPhoto
                   ? const SizedBox(
                       width: 18,
                       height: 18,
@@ -265,7 +276,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   children: [
                     GestureDetector(
-                      onTap: _pickPhoto,
+                      onTap: _isUploadingPhoto ? null : _pickPhoto,
                       child: Stack(
                         children: [
                           Container(
@@ -278,32 +289,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   color: const Color(0xFFE0E8DC), width: 3),
                               image: _buildPhotoDecoration(),
                             ),
-                            child: _babyPhotoPath == null
-                                ? const Icon(Icons.child_care_rounded,
-                                    size: 48, color: Color(0xFFB0C4A8))
-                                : null,
+                            child: _isUploadingPhoto
+                                ? const CircularProgressIndicator(strokeWidth: 2)
+                                : _babyPhotoPath == null
+                                    ? const Icon(Icons.child_care_rounded,
+                                        size: 48, color: Color(0xFFB0C4A8))
+                                    : null,
                           ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFF66BB6A),
-                                    Color(0xFF43A047)
-                                  ],
+                          if (!_isUploadingPhoto)
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF66BB6A),
+                                      Color(0xFF43A047)
+                                    ],
+                                  ),
+                                  shape: BoxShape.circle,
+                                  border:
+                                      Border.all(color: Colors.white, width: 2),
                                 ),
-                                shape: BoxShape.circle,
-                                border:
-                                    Border.all(color: Colors.white, width: 2),
+                                child: const Icon(Icons.camera_alt_rounded,
+                                    size: 16, color: Colors.white),
                               ),
-                              child: const Icon(Icons.camera_alt_rounded,
-                                  size: 16, color: Colors.white),
                             ),
-                          ),
                         ],
                       ),
                     ),
@@ -374,6 +388,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         prefixIcon: Icon(Icons.child_care_rounded,
                             color: Color(0xFFFFA726)),
                       ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // 아기 몸무게
+                    TextFormField(
+                      controller: _babyWeightController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: '아기 몸무게',
+                        hintText: '예: 7.5',
+                        prefixIcon: Icon(Icons.monitor_weight_outlined,
+                            color: Color(0xFF26A69A)),
+                        suffixText: 'kg',
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return null;
+                        final val = double.tryParse(v.trim());
+                        if (val == null || val <= 0 || val > 30) {
+                          return '올바른 몸무게를 입력하세요 (0~30 kg)';
+                        }
+                        return null;
+                      },
                     ),
 
                     const SizedBox(height: 20),

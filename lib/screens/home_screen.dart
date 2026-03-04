@@ -213,7 +213,7 @@ class HomeScreen extends StatelessWidget {
                 ),
                 _DrawerMenuItem(
                   icon: Icons.calendar_month_rounded,
-                  label: '이유식 일지',
+                  label: '이유식/아이 기록',
                   iconColor: const Color(0xFFFF7043),
                   onTap: () {
                     Navigator.pop(context);
@@ -312,19 +312,30 @@ class HomeScreen extends StatelessWidget {
     final profile = authProvider.userProfile;
     final photoPath = profile?.babyPhotoPath;
 
-    if (photoPath != null && !kIsWeb && ImageService().isLocalFile(photoPath)) {
-      final file = File(photoPath);
-      if (file.existsSync()) {
-        return Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2.5),
-            image: DecorationImage(image: FileImage(file), fit: BoxFit.cover),
-          ),
-        );
+    DecorationImage? photoDecoration;
+    if (photoPath != null) {
+      if (photoPath.startsWith('http')) {
+        photoDecoration = DecorationImage(
+            image: NetworkImage(photoPath), fit: BoxFit.cover);
+      } else if (!kIsWeb && ImageService().isLocalFile(photoPath)) {
+        final file = File(photoPath);
+        if (file.existsSync()) {
+          photoDecoration =
+              DecorationImage(image: FileImage(file), fit: BoxFit.cover);
+        }
       }
+    }
+
+    if (photoDecoration != null) {
+      return Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2.5),
+          image: photoDecoration,
+        ),
+      );
     }
 
     return Container(

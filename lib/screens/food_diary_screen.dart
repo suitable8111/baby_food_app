@@ -10,6 +10,7 @@ import '../models/recipe.dart';
 import '../providers/diary_provider.dart';
 import '../providers/recipe_provider.dart';
 import '../providers/auth_provider.dart';
+import 'weekly_stats_screen.dart';
 
 class FoodDiaryScreen extends StatefulWidget {
   const FoodDiaryScreen({super.key});
@@ -19,7 +20,7 @@ class FoodDiaryScreen extends StatefulWidget {
 }
 
 class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
-  CalendarFormat _calendarFormat = CalendarFormat.month;
+  CalendarFormat _calendarFormat = CalendarFormat.week;
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
 
@@ -51,6 +52,17 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
       backgroundColor: const Color(0xFFF8FAF6),
       appBar: AppBar(
         title: const Text('이유식 일지'),
+        actions: [
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const WeeklyStatsScreen()),
+            ),
+            icon: const Icon(Icons.bar_chart_rounded),
+            tooltip: '주간 통계',
+          ),
+        ],
       ),
       body: diaryProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -60,7 +72,7 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                 _buildCalendar(diaryProvider),
                 const SizedBox(height: 12),
                 // 영양 요약 카드 (이유식 엔트리가 있을 때만)
-                if (selectedEntries.any((e) => !e.isMilkEntry))
+                if (selectedEntries.any((e) => e.entryType.isNutritionEntry))
                   _buildNutritionCard(dayNutrition, babyAgeMonths, diaryProvider),
                 const SizedBox(height: 8),
                 // 타임라인 헤더
@@ -101,8 +113,7 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                 if (selectedEntries.isEmpty)
                   _buildEmptyState()
                 else
-                  ...selectedEntries
-                      .map((entry) => _buildTimelineItem(entry)),
+                  ...selectedEntries.map((entry) => _buildTimelineItem(entry)),
                 const SizedBox(height: 80),
               ],
             ),
@@ -138,10 +149,9 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
         lastDay: DateTime(2030),
         focusedDay: _focusedDay,
         calendarFormat: _calendarFormat,
+        availableCalendarFormats: const {CalendarFormat.week: '주'},
         selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-        eventLoader: (day) {
-          return diaryProvider.getEntriesForDate(day);
-        },
+        eventLoader: (day) => diaryProvider.getEntriesForDate(day),
         onDaySelected: (selected, focused) {
           setState(() {
             _selectedDay = selected;
@@ -190,7 +200,7 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
           weekendTextStyle: const TextStyle(color: Color(0xFFE57373)),
         ),
         headerStyle: HeaderStyle(
-          formatButtonVisible: true,
+          formatButtonVisible: false,
           titleCentered: true,
           formatButtonDecoration: BoxDecoration(
             border: Border.all(color: const Color(0xFF6BBF59)),
@@ -432,7 +442,7 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
       child: Column(
         children: [
           Icon(
-            Icons.restaurant_rounded,
+            Icons.edit_note_rounded,
             size: 48,
             color: Colors.grey.shade300,
           ),
@@ -447,7 +457,7 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            '아래 버튼으로 이유식 기록을 추가해 보세요',
+            '아래 버튼으로 기록을 추가해 보세요',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey.shade400,
@@ -463,10 +473,7 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     final authProvider = context.read<AuthProvider>();
     final showAuthor = authProvider.hasPartner && entry.authorName != null;
     final timeStr = DateFormat('HH:mm').format(entry.mealTime);
-    final isMilk = entry.isMilkEntry;
-    final deleteLabel = isMilk
-        ? '${entry.entryType.displayName} ${entry.milkAmountMl ?? 0}ml'
-        : entry.recipeName;
+    final deleteLabel = _getEntryLabel(entry);
 
     return Dismissible(
       key: Key(entry.id),
@@ -524,20 +531,18 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              // 시간 + 아이콘
+              // 아이콘 + 시간
               Column(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: isMilk
-                          ? entry.entryType.color.withValues(alpha: 0.12)
-                          : entry.mealType.color.withValues(alpha: 0.12),
+                      color: entry.entryType.color.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
-                      isMilk ? entry.entryType.icon : entry.mealType.icon,
-                      color: isMilk ? entry.entryType.color : entry.mealType.color,
+                      entry.entryType.icon,
+                      color: entry.entryType.color,
                       size: 22,
                     ),
                   ),
@@ -570,11 +575,18 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                           ),
                         ),
                       ),
-                    isMilk
-                        ? _buildMilkEntryInfo(entry)
-                        : _buildFoodEntryInfo(entry),
+                    _buildEntryInfo(entry),
                   ],
                 ),
+              ),
+              // 수정 버튼
+              IconButton(
+                icon: Icon(Icons.edit_outlined,
+                    size: 18, color: Colors.grey.shade400),
+                onPressed: () =>
+                    _showAddEntrySheet(context, entryToEdit: entry),
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(6),
               ),
             ],
           ),
@@ -583,48 +595,92 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     );
   }
 
-  Widget _buildMilkEntryInfo(FoodDiaryEntry entry) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: entry.entryType.color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            entry.entryType.displayName,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: entry.entryType.color,
-            ),
-          ),
+  String _getEntryLabel(FoodDiaryEntry entry) {
+    switch (entry.entryType) {
+      case EntryType.food:
+        return entry.recipeName;
+      case EntryType.formulaMilk:
+      case EntryType.breastMilk:
+      case EntryType.pumpedMilk:
+      case EntryType.pumping:
+      case EntryType.cowMilk:
+      case EntryType.water:
+        return '${entry.entryType.displayName} ${entry.milkAmountMl ?? 0}ml';
+      case EntryType.snackFood:
+        return entry.recipeName.isEmpty
+            ? entry.entryType.displayName
+            : entry.recipeName;
+      case EntryType.diaper:
+        return '${entry.entryType.displayName} (${entry.diaperType?.displayName ?? ''})';
+      case EntryType.sleep:
+      case EntryType.bath:
+      case EntryType.play:
+      case EntryType.tummyTime:
+        final min = entry.durationMinutes ?? 0;
+        return '${entry.entryType.displayName} $min분';
+      case EntryType.temperature:
+        return '${entry.entryType.displayName} ${entry.temperatureCelsius?.toStringAsFixed(1) ?? ''}°C';
+      case EntryType.medication:
+        return entry.recipeName.isEmpty
+            ? entry.entryType.displayName
+            : entry.recipeName;
+      case EntryType.hospital:
+      case EntryType.other:
+        return entry.entryType.displayName;
+    }
+  }
+
+  Widget _buildEntryInfo(FoodDiaryEntry entry) {
+    switch (entry.entryType) {
+      case EntryType.food:
+        return _buildFoodEntryInfo(entry);
+      case EntryType.formulaMilk:
+      case EntryType.breastMilk:
+      case EntryType.pumpedMilk:
+      case EntryType.pumping:
+      case EntryType.cowMilk:
+      case EntryType.water:
+        return _buildLiquidEntryInfo(entry);
+      case EntryType.snackFood:
+        return _buildSimpleEntryInfo(
+          entry,
+          subtitle: entry.recipeName.isEmpty ? null : entry.recipeName,
+        );
+      case EntryType.diaper:
+        return _buildDiaperEntryInfo(entry);
+      case EntryType.sleep:
+      case EntryType.bath:
+      case EntryType.play:
+      case EntryType.tummyTime:
+        return _buildDurationEntryInfo(entry);
+      case EntryType.temperature:
+        return _buildTemperatureEntryInfo(entry);
+      case EntryType.medication:
+        return _buildSimpleEntryInfo(
+          entry,
+          subtitle: entry.recipeName.isEmpty ? null : entry.recipeName,
+        );
+      case EntryType.hospital:
+      case EntryType.other:
+        return _buildSimpleEntryInfo(entry);
+    }
+  }
+
+  Widget _buildTypeChip(EntryType type) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: type.color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        type.displayName,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: type.color,
         ),
-        const SizedBox(height: 6),
-        Text(
-          '${entry.entryType.displayName} ${entry.milkAmountMl ?? 0}ml',
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF2D2D2D),
-          ),
-        ),
-        if (entry.memo != null && entry.memo!.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text(
-            entry.memo!,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade400,
-              fontStyle: FontStyle.italic,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ],
+      ),
     );
   }
 
@@ -635,24 +691,11 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
       children: [
         Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: entry.mealType.color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                entry.mealType.displayName,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: entry.mealType.color,
-                ),
-              ),
-            ),
+            _buildTypeChip(entry.entryType),
             const SizedBox(width: 6),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: stageColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
@@ -680,9 +723,37 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
         const SizedBox(height: 4),
         Text(
           '${entry.nutrition.calories.toStringAsFixed(0)} kcal  |  단백질 ${entry.nutrition.protein.toStringAsFixed(1)}g',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade500,
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+        ),
+        if (entry.memo != null && entry.memo!.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            entry.memo!,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade400,
+              fontStyle: FontStyle.italic,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildLiquidEntryInfo(FoodDiaryEntry entry) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTypeChip(entry.entryType),
+        const SizedBox(height: 6),
+        Text(
+          '${entry.milkAmountMl ?? 0} ml',
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF2D2D2D),
           ),
         ),
         if (entry.memo != null && entry.memo!.isNotEmpty) ...[
@@ -702,16 +773,220 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     );
   }
 
-  // ====== 기록 추가 바텀시트 ======
-  void _showAddEntrySheet(BuildContext outerContext) {
-    EntryType selectedEntryType = EntryType.food;
-    MealType selectedMealType = MealType.breakfast;
-    TimeOfDay selectedTime = TimeOfDay.now();
-    Recipe? selectedRecipe;
-    final memoController = TextEditingController();
-    final mlController = TextEditingController();
+  Widget _buildDiaperEntryInfo(FoodDiaryEntry entry) {
+    final dtype = entry.diaperType;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTypeChip(entry.entryType),
+        const SizedBox(height: 6),
+        if (dtype != null)
+          Row(
+            children: [
+              Icon(dtype.icon, color: dtype.color, size: 16),
+              const SizedBox(width: 4),
+              Text(
+                dtype.displayName,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF2D2D2D),
+                ),
+              ),
+            ],
+          )
+        else
+          const Text(
+            '기저귀 교체',
+            style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF2D2D2D)),
+          ),
+        if (entry.memo != null && entry.memo!.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            entry.memo!,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade400,
+              fontStyle: FontStyle.italic,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDurationEntryInfo(FoodDiaryEntry entry) {
+    final min = entry.durationMinutes ?? 0;
+    String durationStr;
+    if (min >= 60) {
+      final h = min ~/ 60;
+      final m = min % 60;
+      durationStr = m > 0 ? '$h시간 $m분' : '$h시간';
+    } else {
+      durationStr = '$min분';
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTypeChip(entry.entryType),
+        const SizedBox(height: 6),
+        Text(
+          durationStr,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF2D2D2D),
+          ),
+        ),
+        if (entry.memo != null && entry.memo!.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            entry.memo!,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade400,
+              fontStyle: FontStyle.italic,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildTemperatureEntryInfo(FoodDiaryEntry entry) {
+    final temp = entry.temperatureCelsius;
+    final isHigh = temp != null && temp >= 37.5;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTypeChip(entry.entryType),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Text(
+              temp != null ? '${temp.toStringAsFixed(1)}°C' : '-',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: isHigh
+                    ? const Color(0xFFE57373)
+                    : const Color(0xFF2D2D2D),
+              ),
+            ),
+            if (isHigh) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE57373).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  '발열',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFE57373),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        if (entry.memo != null && entry.memo!.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            entry.memo!,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade400,
+              fontStyle: FontStyle.italic,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSimpleEntryInfo(FoodDiaryEntry entry, {String? subtitle}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTypeChip(entry.entryType),
+        if (subtitle != null && subtitle.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF2D2D2D),
+            ),
+          ),
+        ],
+        if (entry.memo != null && entry.memo!.isNotEmpty) ...[
+          SizedBox(height: subtitle != null ? 4 : 6),
+          Text(
+            entry.memo!,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade400,
+              fontStyle: FontStyle.italic,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ====== 기록 추가/수정 바텀시트 ======
+  void _showAddEntrySheet(BuildContext outerContext,
+      {FoodDiaryEntry? entryToEdit}) {
+    final isEditing = entryToEdit != null;
+    final recipeProviderForInit =
+        isEditing ? outerContext.read<RecipeProvider>() : null;
+
+    EntryType selectedEntryType =
+        entryToEdit?.entryType ?? EntryType.formulaMilk;
+    MealType selectedMealType = entryToEdit?.mealType ?? MealType.breakfast;
+    TimeOfDay selectedTime = entryToEdit != null
+        ? TimeOfDay.fromDateTime(entryToEdit.mealTime)
+        : TimeOfDay.now();
+    Recipe? selectedRecipe =
+        (entryToEdit != null && entryToEdit.recipeId.isNotEmpty)
+            ? recipeProviderForInit?.getRecipeById(entryToEdit.recipeId)
+            : null;
+    DiaperType? selectedDiaperType =
+        entryToEdit?.diaperType ?? DiaperType.wet;
+
+    final memoController =
+        TextEditingController(text: entryToEdit?.memo ?? '');
+    final mlController = TextEditingController(
+        text: entryToEdit?.milkAmountMl?.toString() ?? '');
+    final nameController = TextEditingController(
+        text: (entryToEdit != null && entryToEdit.entryType != EntryType.food)
+            ? entryToEdit.recipeName
+            : '');
+    final tempController = TextEditingController(
+        text: entryToEdit?.temperatureCelsius?.toString() ?? '');
+    final durationController = TextEditingController(
+        text: entryToEdit?.durationMinutes?.toString() ?? '');
+
     String searchQuery = '';
-    int? selectedMl;
+    int? selectedMl = entryToEdit?.milkAmountMl;
+    int? selectedDuration = entryToEdit?.durationMinutes;
 
     showModalBottomSheet(
       context: outerContext,
@@ -730,16 +1005,45 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                         .contains(searchQuery.toLowerCase()))
                     .toList();
 
-            final isMilk = selectedEntryType != EntryType.food;
-            final canSave = isMilk
-                ? (selectedMl != null && selectedMl! > 0)
-                : selectedRecipe != null;
+            final type = selectedEntryType;
 
-            return Container(
-              height: MediaQuery.of(ctx).size.height * 0.85,
+            bool canSave() {
+              switch (type) {
+                case EntryType.food:
+                  return selectedRecipe != null;
+                case EntryType.formulaMilk:
+                case EntryType.breastMilk:
+                case EntryType.pumpedMilk:
+                case EntryType.pumping:
+                case EntryType.cowMilk:
+                case EntryType.water:
+                  return selectedMl != null && selectedMl! > 0;
+                case EntryType.sleep:
+                case EntryType.bath:
+                case EntryType.play:
+                case EntryType.tummyTime:
+                  return selectedDuration != null && selectedDuration! > 0;
+                case EntryType.temperature:
+                  return tempController.text.trim().isNotEmpty &&
+                      double.tryParse(tempController.text.trim()) != null;
+                case EntryType.diaper:
+                case EntryType.snackFood:
+                case EntryType.medication:
+                case EntryType.hospital:
+                case EntryType.other:
+                  return true;
+              }
+            }
+
+            return GestureDetector(
+              onTap: () => FocusScope.of(ctx).unfocus(),
+              behavior: HitTestBehavior.translucent,
+              child: Container(
+              height: MediaQuery.of(ctx).size.height * 0.9,
               decoration: const BoxDecoration(
                 color: Color(0xFFF8FAF6),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
                 children: [
@@ -778,123 +1082,29 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                     child: ListView(
                       padding: const EdgeInsets.all(20),
                       children: [
-                        // 기록 유형 선택
-                        const Text('기록 유형',
-                            style: TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: EntryType.values.map((type) {
-                            final isSelected = selectedEntryType == type;
-                            return Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.only(
-                                    right: type != EntryType.breastMilk ? 8 : 0),
-                                child: Material(
-                                  color: isSelected
-                                      ? type.color
-                                      : type.color.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: InkWell(
-                                    onTap: () => setSheetState(() {
-                                      selectedEntryType = type;
-                                      selectedRecipe = null;
-                                      selectedMl = null;
-                                      mlController.clear();
-                                    }),
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 12),
-                                      child: Column(
-                                        children: [
-                                          Icon(type.icon,
-                                              color: isSelected
-                                                  ? Colors.white
-                                                  : type.color,
-                                              size: 22),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            type.displayName,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: isSelected
-                                                  ? Colors.white
-                                                  : type.color,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                        // ── 기록 유형 선택 ──
+                        _buildEntryTypeGrid(
+                          selectedEntryType,
+                          (newType) => setSheetState(() {
+                            selectedEntryType = newType;
+                            selectedRecipe = null;
+                            selectedMl = null;
+                            selectedDuration = null;
+                            selectedDiaperType = DiaperType.wet;
+                            mlController.clear();
+                            tempController.clear();
+                            durationController.clear();
+                            nameController.clear();
+                          }),
                         ),
 
                         const SizedBox(height: 20),
 
-                        // 식사 유형 선택 (이유식만)
-                        if (!isMilk) ...[
-                          const Text('식사 유형',
-                              style: TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: MealType.values.map((type) {
-                              final isSelected = selectedMealType == type;
-                              return Expanded(
-                                child: Padding(
-                                  padding: EdgeInsets.only(
-                                      right: type != MealType.snack ? 8 : 0),
-                                  child: Material(
-                                    color: isSelected
-                                        ? type.color
-                                        : type.color.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: InkWell(
-                                      onTap: () => setSheetState(
-                                          () => selectedMealType = type),
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 12),
-                                        child: Column(
-                                          children: [
-                                            Icon(type.icon,
-                                                color: isSelected
-                                                    ? Colors.white
-                                                    : type.color,
-                                                size: 22),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              type.displayName,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                                color: isSelected
-                                                    ? Colors.white
-                                                    : type.color,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                          const SizedBox(height: 20),
-                        ],
-
-                        // 시간 선택
-                        const Text('먹은 시간',
+                        // ── 시간 선택 ──
+                        const Text('시간',
                             style: TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w600)),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600)),
                         const SizedBox(height: 8),
                         Material(
                           color: Colors.white,
@@ -936,185 +1146,82 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
 
                         const SizedBox(height: 20),
 
-                        // 수유: ml 입력
-                        if (isMilk) ...[
-                          const Text('수유량 (ml)',
-                              style: TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [60, 80, 100, 120, 150, 180, 200, 240]
-                                .map((ml) {
-                              final isSelected = selectedMl == ml;
-                              return Material(
-                                color: isSelected
-                                    ? selectedEntryType.color
-                                    : selectedEntryType.color
-                                        .withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(10),
-                                child: InkWell(
-                                  onTap: () => setSheetState(() {
-                                    selectedMl = ml;
-                                    mlController.text = ml.toString();
-                                  }),
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 14, vertical: 10),
-                                    child: Text(
-                                      '${ml}ml',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: isSelected
-                                            ? Colors.white
-                                            : selectedEntryType.color,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: mlController,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              hintText: '직접 입력 (ml)',
-                              suffixText: 'ml',
-                              filled: true,
-                              fillColor: Colors.white,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide:
-                                    BorderSide(color: Colors.grey.shade200),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide:
-                                    BorderSide(color: Colors.grey.shade200),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 12),
-                            ),
-                            onChanged: (v) {
-                              final parsed = int.tryParse(v);
-                              setSheetState(() => selectedMl = parsed);
-                            },
+                        // ── 유형별 입력 ──
+                        if (type == EntryType.food) ...[
+                          _buildMealTypeSection(
+                              selectedMealType,
+                              (m) =>
+                                  setSheetState(() => selectedMealType = m)),
+                          const SizedBox(height: 20),
+                          _buildRecipePicker(
+                            filtered: filtered,
+                            selected: selectedRecipe,
+                            onSelect: (r) =>
+                                setSheetState(() => selectedRecipe = r),
+                            onSearch: (q) =>
+                                setSheetState(() => searchQuery = q),
                           ),
                         ],
 
-                        // 이유식: 레시피 선택
-                        if (!isMilk) ...[
-                          const Text('레시피 선택',
-                              style: TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 8),
-                          TextField(
-                            decoration: InputDecoration(
-                              hintText: '레시피 검색...',
-                              prefixIcon: const Icon(
-                                  Icons.search_rounded,
-                                  size: 20),
-                              filled: true,
-                              fillColor: Colors.white,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: BorderSide(
-                                    color: Colors.grey.shade200),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: BorderSide(
-                                    color: Colors.grey.shade200),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  vertical: 12),
-                            ),
-                            onChanged: (v) =>
-                                setSheetState(() => searchQuery = v),
+                        if (type.isLiquidEntry) ...[
+                          _buildMlSection(
+                            entryType: type,
+                            selectedMl: selectedMl,
+                            mlController: mlController,
+                            onSelect: (ml) => setSheetState(() {
+                              selectedMl = ml;
+                              mlController.text = ml.toString();
+                            }),
+                            onChange: (v) => setSheetState(
+                                () => selectedMl = int.tryParse(v)),
                           ),
-                          const SizedBox(height: 8),
-                          Container(
-                            constraints: const BoxConstraints(maxHeight: 200),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border:
-                                  Border.all(color: Colors.grey.shade200),
-                            ),
-                            child: ListView.separated(
-                              shrinkWrap: true,
-                              itemCount: filtered.length,
-                              separatorBuilder: (_, _) =>
-                                  Divider(height: 1, color: Colors.grey.shade100),
-                              itemBuilder: (_, i) {
-                                final recipe = filtered[i];
-                                final isSelected =
-                                    selectedRecipe?.id == recipe.id;
-                                final stageColor =
-                                    _getStageColor(recipe.stage);
-                                return ListTile(
-                                  dense: true,
-                                  selected: isSelected,
-                                  selectedTileColor: const Color(0xFF6BBF59)
-                                      .withValues(alpha: 0.08),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(
-                                        i == 0
-                                            ? 14
-                                            : i == filtered.length - 1
-                                                ? 14
-                                                : 0),
-                                  ),
-                                  leading: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: stageColor.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      recipe.stage.shortName,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: stageColor,
-                                      ),
-                                    ),
-                                  ),
-                                  title: Text(
-                                    recipe.name,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                    ),
-                                  ),
-                                  trailing: isSelected
-                                      ? const Icon(
-                                          Icons.check_circle_rounded,
-                                          color: Color(0xFF6BBF59),
-                                          size: 20)
-                                      : null,
-                                  onTap: () => setSheetState(
-                                      () => selectedRecipe = recipe),
-                                );
-                              },
-                            ),
+                        ],
+
+                        if (type == EntryType.diaper) ...[
+                          _buildDiaperSection(
+                            selected: selectedDiaperType,
+                            onSelect: (d) => setSheetState(
+                                () => selectedDiaperType = d),
+                          ),
+                        ],
+
+                        if (type.isDurationEntry) ...[
+                          _buildDurationSection(
+                            entryType: type,
+                            selected: selectedDuration,
+                            controller: durationController,
+                            onSelect: (d) => setSheetState(() {
+                              selectedDuration = d;
+                              durationController.text = d.toString();
+                            }),
+                            onChange: (v) => setSheetState(
+                                () => selectedDuration = int.tryParse(v)),
+                          ),
+                        ],
+
+                        if (type == EntryType.temperature) ...[
+                          _buildTemperatureSection(
+                            controller: tempController,
+                            onChange: (_) => setSheetState(() {}),
+                          ),
+                        ],
+
+                        if (type == EntryType.snackFood ||
+                            type == EntryType.medication) ...[
+                          _buildNameSection(
+                            type: type,
+                            controller: nameController,
+                            onChange: (_) => setSheetState(() {}),
                           ),
                         ],
 
                         const SizedBox(height: 20),
 
-                        // 메모
+                        // ── 메모 ──
                         const Text('메모 (선택)',
                             style: TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w600)),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600)),
                         const SizedBox(height: 8),
                         TextField(
                           controller: memoController,
@@ -1125,43 +1232,65 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                             fillColor: Colors.white,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(
-                                  color: Colors.grey.shade200),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade200),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(
-                                  color: Colors.grey.shade200),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade200),
                             ),
                           ),
                         ),
 
                         const SizedBox(height: 24),
 
-                        // 저장 버튼
+                        // ── 저장 버튼 ──
                         FilledButton(
-                          onPressed: !canSave
+                          onPressed: !canSave()
                               ? null
-                              : () => _saveEntry(
-                                    sheetContext: ctx,
-                                    entryType: selectedEntryType,
-                                    mealType: selectedMealType,
-                                    time: selectedTime,
-                                    recipe: selectedRecipe,
-                                    milkAmountMl: selectedMl,
-                                    memo: memoController.text.trim(),
-                                  ),
+                              : isEditing
+                                  ? () => _updateEntry(
+                                        sheetContext: ctx,
+                                        original: entryToEdit,
+                                        entryType: selectedEntryType,
+                                        mealType: selectedMealType,
+                                        time: selectedTime,
+                                        recipe: selectedRecipe,
+                                        milkAmountMl: selectedMl,
+                                        diaperType: selectedDiaperType,
+                                        durationMinutes: selectedDuration,
+                                        temperatureCelsius: double.tryParse(
+                                            tempController.text.trim()),
+                                        name: nameController.text.trim(),
+                                        memo: memoController.text.trim(),
+                                      )
+                                  : () => _saveEntry(
+                                        sheetContext: ctx,
+                                        entryType: selectedEntryType,
+                                        mealType: selectedMealType,
+                                        time: selectedTime,
+                                        recipe: selectedRecipe,
+                                        milkAmountMl: selectedMl,
+                                        diaperType: selectedDiaperType,
+                                        durationMinutes: selectedDuration,
+                                        temperatureCelsius: double.tryParse(
+                                            tempController.text.trim()),
+                                        name: nameController.text.trim(),
+                                        memo: memoController.text.trim(),
+                                      ),
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFFFF7043),
                             disabledBackgroundColor: Colors.grey.shade300,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
-                          child: const Text(
-                            '저장',
-                            style: TextStyle(
+                          child: Text(
+                            isEditing ? '수정' : '저장',
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1172,13 +1301,552 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                   ),
                 ],
               ),
-            );
+            ), // Container
+            ); // GestureDetector
           },
         );
       },
     );
   }
 
+  // ── 기록 유형 그리드 ──
+  static const _entryCategories = [
+    {'label': '수유 / 음식', 'types': [
+      EntryType.food, EntryType.formulaMilk, EntryType.breastMilk,
+      EntryType.pumpedMilk, EntryType.pumping, EntryType.cowMilk,
+      EntryType.water, EntryType.snackFood,
+    ]},
+    {'label': '돌봄', 'types': [
+      EntryType.diaper, EntryType.bath, EntryType.hospital,
+      EntryType.temperature, EntryType.medication,
+    ]},
+    {'label': '활동', 'types': [
+      EntryType.sleep, EntryType.play, EntryType.tummyTime,
+    ]},
+    {'label': '기타', 'types': [EntryType.other]},
+  ];
+
+  Widget _buildEntryTypeGrid(
+      EntryType selected, void Function(EntryType) onSelect) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final category in _entryCategories) ...[
+          Text(
+            category['label'] as String,
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: (category['types'] as List<EntryType>).map((type) {
+              final isSelected = selected == type;
+              return GestureDetector(
+                onTap: () => onSelect(type),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? type.color
+                        : type.color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: isSelected
+                        ? null
+                        : Border.all(
+                            color: type.color.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        type.icon,
+                        size: 16,
+                        color: isSelected ? Colors.white : type.color,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        type.displayName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isSelected ? Colors.white : type.color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 14),
+        ],
+      ],
+    );
+  }
+
+  // ── 식사 유형 ──
+  Widget _buildMealTypeSection(
+      MealType selected, void Function(MealType) onSelect) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('식사 유형',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Row(
+          children: MealType.values.map((type) {
+            final isSelected = selected == type;
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                    right: type != MealType.snack ? 8 : 0),
+                child: Material(
+                  color: isSelected
+                      ? type.color
+                      : type.color.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: () => onSelect(type),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Column(
+                        children: [
+                          Icon(type.icon,
+                              color:
+                                  isSelected ? Colors.white : type.color,
+                              size: 22),
+                          const SizedBox(height: 4),
+                          Text(
+                            type.displayName,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color:
+                                  isSelected ? Colors.white : type.color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  // ── 레시피 선택 ──
+  Widget _buildRecipePicker({
+    required List<Recipe> filtered,
+    required Recipe? selected,
+    required void Function(Recipe) onSelect,
+    required void Function(String) onSearch,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('레시피 선택',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        TextField(
+          decoration: InputDecoration(
+            hintText: '레시피 검색...',
+            prefixIcon:
+                const Icon(Icons.search_rounded, size: 20),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide:
+                  BorderSide(color: Colors.grey.shade200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide:
+                  BorderSide(color: Colors.grey.shade200),
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 12),
+          ),
+          onChanged: onSearch,
+        ),
+        const SizedBox(height: 8),
+        Container(
+          constraints: const BoxConstraints(maxHeight: 200),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: filtered.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Center(
+                    child: Text('레시피가 없습니다',
+                        style: TextStyle(
+                            color: Colors.grey.shade400)),
+                  ),
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, si) =>
+                      Divider(height: 1, color: Colors.grey.shade100),
+                  itemBuilder: (_, i) {
+                    final recipe = filtered[i];
+                    final isSelected = selected?.id == recipe.id;
+                    final stageColor = _getStageColor(recipe.stage);
+                    return ListTile(
+                      dense: true,
+                      selected: isSelected,
+                      selectedTileColor: const Color(0xFF6BBF59)
+                          .withValues(alpha: 0.08),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                            i == 0
+                                ? 14
+                                : i == filtered.length - 1
+                                    ? 14
+                                    : 0),
+                      ),
+                      leading: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: stageColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          recipe.stage.shortName,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: stageColor,
+                          ),
+                        ),
+                      ),
+                      title: Text(
+                        recipe.name,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: isSelected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                        ),
+                      ),
+                      trailing: isSelected
+                          ? const Icon(Icons.check_circle_rounded,
+                              color: Color(0xFF6BBF59), size: 20)
+                          : null,
+                      onTap: () => onSelect(recipe),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  // ── ml 입력 ──
+  Widget _buildMlSection({
+    required EntryType entryType,
+    required int? selectedMl,
+    required TextEditingController mlController,
+    required void Function(int) onSelect,
+    required void Function(String) onChange,
+  }) {
+    const presets = [60, 80, 100, 120, 150, 180, 200, 240];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('${entryType.displayName} 양 (ml)',
+            style: const TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: presets.map((ml) {
+            final isSelected = selectedMl == ml;
+            return Material(
+              color: isSelected
+                  ? entryType.color
+                  : entryType.color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              child: InkWell(
+                onTap: () => onSelect(ml),
+                borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  child: Text(
+                    '${ml}ml',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : entryType.color,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: mlController,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            hintText: '직접 입력 (ml)',
+            suffixText: 'ml',
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          onChanged: onChange,
+        ),
+      ],
+    );
+  }
+
+  // ── 기저귀 선택 ──
+  Widget _buildDiaperSection({
+    required DiaperType? selected,
+    required void Function(DiaperType) onSelect,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('기저귀 종류',
+            style:
+                TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Row(
+          children: DiaperType.values.map((d) {
+            final isSelected = selected == d;
+            return Expanded(
+              child: Padding(
+                padding:
+                    EdgeInsets.only(right: d != DiaperType.dry ? 8 : 0),
+                child: Material(
+                  color: isSelected
+                      ? d.color
+                      : d.color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: () => onSelect(d),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Column(
+                        children: [
+                          Icon(d.icon,
+                              color:
+                                  isSelected ? Colors.white : d.color,
+                              size: 20),
+                          const SizedBox(height: 4),
+                          Text(
+                            d.displayName,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color:
+                                  isSelected ? Colors.white : d.color,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  // ── 시간(분) 입력 ──
+  Widget _buildDurationSection({
+    required EntryType entryType,
+    required int? selected,
+    required TextEditingController controller,
+    required void Function(int) onSelect,
+    required void Function(String) onChange,
+  }) {
+    final presets = entryType == EntryType.sleep
+        ? [30, 60, 90, 120, 150, 180]
+        : [5, 10, 15, 20, 30, 45];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('${entryType.displayName} 시간 (분)',
+            style: const TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: presets.map((min) {
+            final isSelected = selected == min;
+            String label;
+            if (min >= 60) {
+              final h = min ~/ 60;
+              final m = min % 60;
+              label = m > 0 ? '${h}h${m}m' : '${h}h';
+            } else {
+              label = '$min분';
+            }
+            return Material(
+              color: isSelected
+                  ? entryType.color
+                  : entryType.color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              child: InkWell(
+                onTap: () => onSelect(min),
+                borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected
+                          ? Colors.white
+                          : entryType.color,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            hintText: '직접 입력 (분)',
+            suffixText: '분',
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          onChanged: onChange,
+        ),
+      ],
+    );
+  }
+
+  // ── 체온 입력 ──
+  Widget _buildTemperatureSection({
+    required TextEditingController controller,
+    required void Function(String) onChange,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('체온',
+            style:
+                TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          keyboardType:
+              const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            hintText: '예: 36.5',
+            suffixText: '°C',
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          onChanged: onChange,
+        ),
+      ],
+    );
+  }
+
+  // ── 이름 입력 (간식/투약) ──
+  Widget _buildNameSection({
+    required EntryType type,
+    required TextEditingController controller,
+    required void Function(String) onChange,
+  }) {
+    final hint = type == EntryType.snackFood ? '간식 이름' : '약 이름 / 용량';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(type == EntryType.snackFood ? '간식 이름 (선택)' : '투약 정보 (선택)',
+            style: const TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            hintText: hint,
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          onChanged: onChange,
+        ),
+      ],
+    );
+  }
+
+  // ====== 저장 ======
   Future<void> _saveEntry({
     required BuildContext sheetContext,
     required EntryType entryType,
@@ -1186,6 +1854,10 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     required TimeOfDay time,
     Recipe? recipe,
     int? milkAmountMl,
+    DiaperType? diaperType,
+    int? durationMinutes,
+    double? temperatureCelsius,
+    String name = '',
     required String memo,
   }) async {
     final authProvider = context.read<AuthProvider>();
@@ -1194,7 +1866,8 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
 
     if (authProvider.userId == null) return;
 
-    final dateOnly = DateTime(_selectedDay.year, _selectedDay.month, _selectedDay.day);
+    final dateOnly = DateTime(
+        _selectedDay.year, _selectedDay.month, _selectedDay.day);
     final mealTime = DateTime(
       _selectedDay.year,
       _selectedDay.month,
@@ -1203,10 +1876,10 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
       time.minute,
     );
 
-    final isMilk = entryType != EntryType.food;
-    final nutrition = isMilk
-        ? Nutrition.empty
-        : recipeProvider.getRecipeNutrition(recipe!);
+    final isFood = entryType == EntryType.food;
+    final nutrition = isFood
+        ? recipeProvider.getRecipeNutrition(recipe!)
+        : Nutrition.empty;
 
     final entry = FoodDiaryEntry(
       id: '',
@@ -1217,11 +1890,16 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
       entryType: entryType,
       mealType: mealType,
       mealTime: mealTime,
-      recipeId: isMilk ? '' : recipe!.id,
-      recipeName: isMilk ? '' : recipe!.name,
-      recipeStage: isMilk ? BabyFoodStage.early : recipe!.stage,
+      recipeId: isFood ? recipe!.id : '',
+      recipeName: isFood
+          ? recipe!.name
+          : (name.isEmpty ? entryType.displayName : name),
+      recipeStage: isFood ? recipe!.stage : BabyFoodStage.early,
       nutrition: nutrition,
       milkAmountMl: milkAmountMl,
+      diaperType: diaperType,
+      durationMinutes: durationMinutes,
+      temperatureCelsius: temperatureCelsius,
       memo: memo.isEmpty ? null : memo,
     );
 
@@ -1231,9 +1909,7 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     Navigator.pop(sheetContext);
 
     if (!mounted) return;
-    final label = isMilk
-        ? '${entryType.displayName} ${milkAmountMl}ml'
-        : recipe!.name;
+    final label = _getEntryLabel(entry);
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('\'$label\' 기록이 추가되었습니다')),
@@ -1242,6 +1918,74 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('저장에 실패했습니다. 다시 시도해 주세요.'),
+          backgroundColor: Color(0xFFE57373),
+        ),
+      );
+    }
+  }
+
+  // ====== 수정 ======
+  Future<void> _updateEntry({
+    required BuildContext sheetContext,
+    required FoodDiaryEntry original,
+    required EntryType entryType,
+    required MealType mealType,
+    required TimeOfDay time,
+    Recipe? recipe,
+    int? milkAmountMl,
+    DiaperType? diaperType,
+    int? durationMinutes,
+    double? temperatureCelsius,
+    String name = '',
+    required String memo,
+  }) async {
+    final recipeProvider = context.read<RecipeProvider>();
+    final diaryProvider = context.read<DiaryProvider>();
+
+    final mealTime = DateTime(
+      original.date.year,
+      original.date.month,
+      original.date.day,
+      time.hour,
+      time.minute,
+    );
+
+    final isFood = entryType == EntryType.food;
+    final nutrition = isFood
+        ? recipeProvider.getRecipeNutrition(recipe!)
+        : Nutrition.empty;
+
+    final updated = original.copyWith(
+      entryType: entryType,
+      mealType: mealType,
+      mealTime: mealTime,
+      recipeId: isFood ? recipe!.id : '',
+      recipeName: isFood
+          ? recipe!.name
+          : (name.isEmpty ? entryType.displayName : name),
+      recipeStage: isFood ? recipe!.stage : BabyFoodStage.early,
+      nutrition: nutrition,
+      milkAmountMl: milkAmountMl,
+      diaperType: diaperType,
+      durationMinutes: durationMinutes,
+      temperatureCelsius: temperatureCelsius,
+      memo: memo.isEmpty ? null : memo,
+    );
+
+    final success = await diaryProvider.updateEntry(updated);
+
+    if (!sheetContext.mounted) return;
+    Navigator.pop(sheetContext);
+
+    if (!mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('기록이 수정되었습니다')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('수정에 실패했습니다. 다시 시도해 주세요.'),
           backgroundColor: Color(0xFFE57373),
         ),
       );

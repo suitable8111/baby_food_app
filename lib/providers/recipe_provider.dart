@@ -5,6 +5,7 @@ import '../models/nutrition.dart';
 import '../models/shared_recipe.dart';
 import '../models/board_recipe.dart';
 import '../services/firebase_service.dart';
+import '../services/image_service.dart';
 import '../data/ingredients_data.dart';
 import '../data/recipes_data.dart' as local_recipes;
 
@@ -381,7 +382,22 @@ class RecipeProvider extends ChangeNotifier {
     if (!_firebaseService.isLoggedIn) return false;
 
     try {
-      await _firebaseService.publishToBoard(recipe);
+      final userId = _firebaseService.currentUserId ?? '';
+      String? photoUrl;
+
+      final imageUrl = recipe.imageUrl;
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        if (imageUrl.startsWith('http')) {
+          photoUrl = imageUrl;
+        } else if (ImageService().isLocalFile(imageUrl)) {
+          final fileId =
+              '${userId}_${DateTime.now().millisecondsSinceEpoch}';
+          photoUrl = await ImageService()
+              .uploadLocalRecipePhoto(userId, fileId, imageUrl);
+        }
+      }
+
+      await _firebaseService.publishToBoard(recipe, photoUrl: photoUrl);
       await loadBoardRecipes();
       return true;
     } catch (e) {

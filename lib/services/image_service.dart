@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -92,6 +93,57 @@ class ImageService {
     } catch (e) {
       debugPrint('이미지 삭제 실패: $e');
       return false;
+    }
+  }
+
+  /// 게시판 레시피 사진을 Firebase Storage에 업로드하고 다운로드 URL 반환
+  Future<String?> uploadBoardRecipePhoto(
+      String userId, String boardId, XFile xFile) async {
+    try {
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('board_recipe_photos/$userId/$boardId.jpg');
+      final bytes = await xFile.readAsBytes();
+      await ref.putData(
+        bytes,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      return await ref.getDownloadURL();
+    } catch (e) {
+      debugPrint('게시판 사진 업로드 실패: ${e.runtimeType} - $e');
+      return null;
+    }
+  }
+
+  /// 레시피의 로컬 이미지를 Storage에 업로드하고 URL 반환 (게시 시 사용)
+  Future<String?> uploadLocalRecipePhoto(
+      String userId, String boardId, String localPath) async {
+    try {
+      final file = File(localPath);
+      if (!file.existsSync()) return null;
+      final xFile = XFile(localPath);
+      return await uploadBoardRecipePhoto(userId, boardId, xFile);
+    } catch (e) {
+      debugPrint('로컬 사진 업로드 실패: $e');
+      return null;
+    }
+  }
+
+  /// 프로필 사진을 Firebase Storage에 업로드하고 다운로드 URL 반환
+  Future<String?> uploadProfilePhoto(String userId, XFile xFile) async {
+    try {
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('profile_photos/$userId/photo.jpg');
+      final bytes = await xFile.readAsBytes();
+      await ref.putData(
+        bytes,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      return await ref.getDownloadURL();
+    } catch (e) {
+      debugPrint('프로필 사진 업로드 실패: ${e.runtimeType} - $e');
+      return null;
     }
   }
 
