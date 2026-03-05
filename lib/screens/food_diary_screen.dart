@@ -23,6 +23,7 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
   CalendarFormat _calendarFormat = CalendarFormat.week;
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
+  double _slideDirection = 0.0; // 1.0 = 다음날(왼쪽으로), -1.0 = 이전날(오른쪽으로)
 
   @override
   void initState() {
@@ -30,6 +31,20 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
     });
+  }
+
+  void _moveDay(int days, DiaryProvider diaryProvider) {
+    final newDay = _selectedDay.add(Duration(days: days));
+    setState(() {
+      _slideDirection = days > 0 ? 1.0 : -1.0;
+      _selectedDay = newDay;
+      _focusedDay = newDay;
+    });
+    diaryProvider.setSelectedDate(newDay);
+    final authProvider = context.read<AuthProvider>();
+    if (authProvider.userId != null) {
+      diaryProvider.loadEntries(authProvider.familyId, newDay);
+    }
   }
 
   void _loadData() {
@@ -51,13 +66,40 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF6),
       appBar: AppBar(
-        title: const Text('이유식 일지'),
+        title: GestureDetector(
+          onTap: () => _showCalendarSheet(diaryProvider),
+          onHorizontalDragEnd: (details) {
+            final dx = details.primaryVelocity ?? 0;
+            if (dx < -200) {
+              _moveDay(1, diaryProvider); // 오른쪽 → 다음날
+            } else if (dx > 200) {
+              _moveDay(-1, diaryProvider); // 왼쪽 → 전날
+            }
+          },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.chevron_left_rounded, size: 20),
+              const SizedBox(width: 2),
+              Text(
+                DateFormat('yyyy년 M월 d일', 'ko').format(_selectedDay),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(width: 2),
+              const Icon(Icons.chevron_right_rounded, size: 20),
+            ],
+          ),
+        ),
         actions: [
+          IconButton(
+            onPressed: () => _showCalendarSheet(diaryProvider),
+            icon: const Icon(Icons.calendar_month_rounded),
+            tooltip: '날짜 선택',
+          ),
           IconButton(
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                  builder: (_) => const WeeklyStatsScreen()),
+              MaterialPageRoute(builder: (_) => const WeeklyStatsScreen()),
             ),
             icon: const Icon(Icons.bar_chart_rounded),
             tooltip: '주간 통계',
@@ -66,56 +108,98 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
       ),
       body: diaryProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              children: [
-                // 캘린더
-                _buildCalendar(diaryProvider),
-                const SizedBox(height: 12),
-                // 영양 요약 카드 (이유식 엔트리가 있을 때만)
-                if (selectedEntries.any((e) => e.entryType.isNutritionEntry))
-                  _buildNutritionCard(dayNutrition, babyAgeMonths, diaryProvider),
-                const SizedBox(height: 8),
-                // 타임라인 헤더
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: [
-                      Text(
-                        DateFormat('M월 d일 (E)', 'ko').format(_selectedDay),
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF2D2D2D),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF6BBF59).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '${selectedEntries.length}건',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF6BBF59),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+          : GestureDetector(
+              onHorizontalDragEnd: (details) {
+                final dx = details.primaryVelocity ?? 0;
+                if (dx < -300) {
+                  _moveDay(1, diaryProvider);
+                } else if (dx > 300) {
+                  _moveDay(-1, diaryProvider);
+                }
+              },
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                reverseDuration: const Duration(milliseconds: 300),
+                layoutBuilder: (currentChild, previousChildren) => Stack(
+                  alignment: Alignment.topCenter,
+                  children: [
+                    ...previousChildren,
+                    ?currentChild,
+                  ],
                 ),
-                const SizedBox(height: 12),
-                // 타임라인
-                if (selectedEntries.isEmpty)
-                  _buildEmptyState()
-                else
-                  ...selectedEntries.map((entry) => _buildTimelineItem(entry)),
-                const SizedBox(height: 80),
-              ],
+                transitionBuilder: (child, animation) {
+                  final isEntering =
+                      child.key == ValueKey(_selectedDay.toIso8601String());
+                  final begin = isEntering
+                      ? Offset(_slideDirection, 0)
+                      : Offset(-_slideDirection, 0);
+                  return SlideTransition(
+                    position: Tween<Offset>(
+                      begin: begin,
+                      end: Offset.zero,
+                    ).animate(CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    )),
+                    child: FadeTransition(
+                      opacity: animation,
+                      child: child,
+                    ),
+                  );
+                },
+                child: ListView(
+                  key: ValueKey(_selectedDay.toIso8601String()),
+                  padding: const EdgeInsets.only(top: 12, bottom: 100),
+                  children: [
+                    // 타임라인 헤더
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          Text(
+                            DateFormat('M월 d일 (E)', 'ko').format(_selectedDay),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF2D2D2D),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6BBF59)
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${selectedEntries.length}건',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF6BBF59),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // 영양 요약 카드 (이유식 엔트리가 있을 때만)
+                    if (selectedEntries.any((e) => e.entryType.isNutritionEntry))
+                      _buildNutritionCard(
+                          dayNutrition, babyAgeMonths, diaryProvider),
+                    const SizedBox(height: 8),
+                    // 타임라인
+                    if (selectedEntries.isEmpty)
+                      _buildEmptyState()
+                    else
+                      ...selectedEntries
+                          .map((entry) => _buildTimelineItem(entry)),
+                  ],
+                ),
+              ),
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddEntrySheet(context),
@@ -128,8 +212,42 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     );
   }
 
+  // ====== 달력 바텀시트 ======
+  void _showCalendarSheet(DiaryProvider diaryProvider) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildCalendar(diaryProvider, onDaySelected: (_) {
+              Navigator.pop(ctx);
+            }),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ====== 캘린더 ======
-  Widget _buildCalendar(DiaryProvider diaryProvider) {
+  Widget _buildCalendar(DiaryProvider diaryProvider,
+      {void Function(DateTime)? onDaySelected}) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       decoration: BoxDecoration(
@@ -148,16 +266,25 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
         firstDay: DateTime(2020),
         lastDay: DateTime(2030),
         focusedDay: _focusedDay,
-        calendarFormat: _calendarFormat,
-        availableCalendarFormats: const {CalendarFormat.week: '주'},
+        calendarFormat: onDaySelected != null
+            ? CalendarFormat.month
+            : _calendarFormat,
+        availableCalendarFormats: onDaySelected != null
+            ? const {
+                CalendarFormat.month: '월',
+                CalendarFormat.week: '주',
+              }
+            : const {CalendarFormat.week: '주'},
         selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
         eventLoader: (day) => diaryProvider.getEntriesForDate(day),
         onDaySelected: (selected, focused) {
           setState(() {
+            _slideDirection = selected.isAfter(_selectedDay) ? 1.0 : -1.0;
             _selectedDay = selected;
             _focusedDay = focused;
           });
           diaryProvider.setSelectedDate(selected);
+          onDaySelected?.call(selected);
         },
         onFormatChanged: (format) {
           setState(() {
@@ -200,7 +327,7 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
           weekendTextStyle: const TextStyle(color: Color(0xFFE57373)),
         ),
         headerStyle: HeaderStyle(
-          formatButtonVisible: false,
+          formatButtonVisible: onDaySelected != null,
           titleCentered: true,
           formatButtonDecoration: BoxDecoration(
             border: Border.all(color: const Color(0xFF6BBF59)),
@@ -599,8 +726,12 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     switch (entry.entryType) {
       case EntryType.food:
         return entry.recipeName;
-      case EntryType.formulaMilk:
       case EntryType.breastMilk:
+        if (entry.milkAmountMl == null) {
+          return '${entry.entryType.displayName} (양 모름)';
+        }
+        return '${entry.entryType.displayName} ${entry.milkAmountMl}ml';
+      case EntryType.formulaMilk:
       case EntryType.pumpedMilk:
       case EntryType.pumping:
       case EntryType.cowMilk:
@@ -749,7 +880,9 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
         _buildTypeChip(entry.entryType),
         const SizedBox(height: 6),
         Text(
-          '${entry.milkAmountMl ?? 0} ml',
+          entry.entryType == EntryType.breastMilk && entry.milkAmountMl == null
+              ? '양 모름'
+              : '${entry.milkAmountMl ?? 0} ml',
           style: const TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w700,
@@ -1011,8 +1144,10 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
               switch (type) {
                 case EntryType.food:
                   return selectedRecipe != null;
-                case EntryType.formulaMilk:
                 case EntryType.breastMilk:
+                  return selectedMl != null &&
+                      (selectedMl! > 0 || selectedMl == -1);
+                case EntryType.formulaMilk:
                 case EntryType.pumpedMilk:
                 case EntryType.pumping:
                 case EntryType.cowMilk:
@@ -1035,11 +1170,13 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
               }
             }
 
+            final keyboardHeight = MediaQuery.of(ctx).viewInsets.bottom;
             return GestureDetector(
               onTap: () => FocusScope.of(ctx).unfocus(),
               behavior: HitTestBehavior.translucent,
               child: Container(
               height: MediaQuery.of(ctx).size.height * 0.9,
+              padding: EdgeInsets.only(bottom: keyboardHeight),
               decoration: const BoxDecoration(
                 color: Color(0xFFF8FAF6),
                 borderRadius:
@@ -1081,6 +1218,8 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                   Expanded(
                     child: ListView(
                       padding: const EdgeInsets.all(20),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
                       children: [
                         // ── 기록 유형 선택 ──
                         _buildEntryTypeGrid(
@@ -1168,6 +1307,11 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                             entryType: type,
                             selectedMl: selectedMl,
                             mlController: mlController,
+                            showUnknown: type == EntryType.breastMilk,
+                            onSelectUnknown: () => setSheetState(() {
+                              selectedMl = -1;
+                              mlController.clear();
+                            }),
                             onSelect: (ml) => setSheetState(() {
                               selectedMl = ml;
                               mlController.text = ml.toString();
@@ -1257,7 +1401,9 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                                         mealType: selectedMealType,
                                         time: selectedTime,
                                         recipe: selectedRecipe,
-                                        milkAmountMl: selectedMl,
+                                        milkAmountMl: selectedMl == -1
+                                            ? null
+                                            : selectedMl,
                                         diaperType: selectedDiaperType,
                                         durationMinutes: selectedDuration,
                                         temperatureCelsius: double.tryParse(
@@ -1271,7 +1417,9 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                                         mealType: selectedMealType,
                                         time: selectedTime,
                                         recipe: selectedRecipe,
-                                        milkAmountMl: selectedMl,
+                                        milkAmountMl: selectedMl == -1
+                                            ? null
+                                            : selectedMl,
                                         diaperType: selectedDiaperType,
                                         durationMinutes: selectedDuration,
                                         temperatureCelsius: double.tryParse(
@@ -1564,8 +1712,41 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     required TextEditingController mlController,
     required void Function(int) onSelect,
     required void Function(String) onChange,
+    bool showUnknown = false,
+    VoidCallback? onSelectUnknown,
   }) {
     const presets = [60, 80, 100, 120, 150, 180, 200, 240];
+    final isUnknown = selectedMl == -1;
+
+    Widget buildChip({
+      required String label,
+      required bool isSelected,
+      required VoidCallback onTap,
+    }) {
+      return Material(
+        color: isSelected
+            ? entryType.color
+            : entryType.color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? Colors.white : entryType.color,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1576,31 +1757,19 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: presets.map((ml) {
-            final isSelected = selectedMl == ml;
-            return Material(
-              color: isSelected
-                  ? entryType.color
-                  : entryType.color.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
-              child: InkWell(
-                onTap: () => onSelect(ml),
-                borderRadius: BorderRadius.circular(10),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
-                  child: Text(
-                    '${ml}ml',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.white : entryType.color,
-                    ),
-                  ),
-                ),
+          children: [
+            if (showUnknown)
+              buildChip(
+                label: '모름',
+                isSelected: isUnknown,
+                onTap: onSelectUnknown ?? () {},
               ),
-            );
-          }).toList(),
+            ...presets.map((ml) => buildChip(
+                  label: '${ml}ml',
+                  isSelected: !isUnknown && selectedMl == ml,
+                  onTap: () => onSelect(ml),
+                )),
+          ],
         ),
         const SizedBox(height: 12),
         TextField(
