@@ -8,6 +8,7 @@ import '../models/board_recipe.dart';
 import '../models/user_profile.dart';
 import '../models/food_diary_entry.dart';
 import '../models/family_invite.dart';
+import '../models/family_message.dart';
 
 /// Firebase 서비스 클래스
 /// Firestore 데이터 CRUD 및 인증 관리
@@ -24,6 +25,7 @@ class FirebaseService {
   CollectionReference get _boardRecipesRef => _firestore.collection('board_recipes');
   CollectionReference get _foodDiaryRef => _firestore.collection('food_diary');
   CollectionReference get _familyInvitesRef => _firestore.collection('family_invites');
+  CollectionReference get _familyMessagesRef => _firestore.collection('family_messages');
 
   // 현재 사용자
   User? get currentUser => _auth.currentUser;
@@ -626,5 +628,31 @@ class FirebaseService {
     if (partnerUserId != null) {
       await _migrateDiaryFamilyId(partnerUserId, partnerUserId);
     }
+  }
+
+  // ==================== 가족 대화방 ====================
+
+  /// 메시지 전송
+  Future<void> sendFamilyMessage(FamilyMessage message) async {
+    await _familyMessagesRef.add(message.toJson());
+  }
+
+  /// 메시지 목록 조회 (클라이언트 정렬 - 복합 인덱스 불필요)
+  Future<List<FamilyMessage>> getFamilyMessages(String familyId,
+      {int limit = 100}) async {
+    final snapshot = await _familyMessagesRef
+        .where('familyId', isEqualTo: familyId)
+        .get();
+    final list =
+        snapshot.docs.map((doc) => FamilyMessage.fromFirestore(doc)).toList();
+    list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    // 최근 N개만 반환
+    if (list.length > limit) return list.sublist(list.length - limit);
+    return list;
+  }
+
+  /// 메시지 삭제 (작성자만)
+  Future<void> deleteFamilyMessage(String messageId) async {
+    await _familyMessagesRef.doc(messageId).delete();
   }
 }

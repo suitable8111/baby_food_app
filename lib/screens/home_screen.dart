@@ -19,6 +19,7 @@ import 'board_screen.dart';
 import 'profile_screen.dart';
 import 'food_diary_screen.dart';
 import 'family_screen.dart';
+import 'family_chat_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -211,10 +212,24 @@ class HomeScreen extends StatelessWidget {
                         MaterialPageRoute(builder: (_) => const MyRecipesScreen()));
                   },
                 ),
+
+                // 섹션 3: 공유하기
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, top: 12, bottom: 4),
+                  child: Text(
+                    '공유하기',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
                 _DrawerMenuItem(
                   icon: Icons.calendar_month_rounded,
                   label: '이유식/아이 기록',
                   iconColor: const Color(0xFFFF7043),
+                  indent: true,
                   onTap: () {
                     Navigator.pop(context);
                     if (!isLoggedIn) { _showLoginRequired(context); return; }
@@ -226,6 +241,7 @@ class HomeScreen extends StatelessWidget {
                   icon: Icons.people_rounded,
                   label: '가족 연동',
                   iconColor: const Color(0xFFEC407A),
+                  indent: true,
                   onTap: () {
                     Navigator.pop(context);
                     if (!isLoggedIn) { _showLoginRequired(context); return; }
@@ -233,8 +249,26 @@ class HomeScreen extends StatelessWidget {
                         MaterialPageRoute(builder: (_) => const FamilyScreen()));
                   },
                 ),
+                _DrawerMenuItem(
+                  icon: Icons.chat_bubble_rounded,
+                  label: '가족 대화방',
+                  iconColor: const Color(0xFF6BBF59),
+                  indent: true,
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (!isLoggedIn) { _showLoginRequired(context); return; }
+                    if (!authProvider.hasPartner) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('먼저 가족 연동을 해주세요.')),
+                      );
+                      return;
+                    }
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const FamilyChatScreen()));
+                  },
+                ),
 
-                // 섹션 3: 공유 게시판
+                // 섹션 4: 공유 게시판
                 Padding(
                   padding: const EdgeInsets.only(left: 16, top: 12, bottom: 4),
                   child: Text(
@@ -570,32 +604,50 @@ class _DrawerMenuItem extends StatelessWidget {
   final String label;
   final Color? iconColor;
   final VoidCallback onTap;
+  final bool indent;
 
   const _DrawerMenuItem({
     required this.icon,
     required this.label,
     this.iconColor,
     required this.onTap,
+    this.indent = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1),
+      padding: EdgeInsets.only(top: 1, bottom: 1, left: indent ? 12 : 0),
       child: ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        leading: Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: (iconColor ?? Colors.grey).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, size: 20, color: iconColor ?? Colors.grey.shade700),
-        ),
+        leading: indent
+            ? Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: (iconColor ?? Colors.grey).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(icon, size: 17,
+                    color: iconColor ?? Colors.grey.shade700),
+              )
+            : Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: (iconColor ?? Colors.grey).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 20,
+                    color: iconColor ?? Colors.grey.shade700),
+              ),
         title: Text(
           label,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            fontSize: indent ? 13 : 14,
+            fontWeight: FontWeight.w500,
+            color: indent ? const Color(0xFF555555) : const Color(0xFF2D2D2D),
+          ),
         ),
         onTap: onTap,
       ),

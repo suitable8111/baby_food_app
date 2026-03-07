@@ -144,6 +144,17 @@ class DiaryProvider extends ChangeNotifier {
 
   // ==================== 주간 통계 ====================
 
+  /// 주간 수유/음료 일별 횟수
+  Map<DateTime, int> getWeeklyLiquidCountStats(DateTime weekStart) {
+    final result = <DateTime, int>{};
+    for (int i = 0; i < 7; i++) {
+      final day = _normalizeDate(weekStart.add(Duration(days: i)));
+      result[day] =
+          getEntriesForDate(day).where((e) => e.entryType.isLiquidEntry).length;
+    }
+    return result;
+  }
+
   /// 주간 수유/음료 일별 ml 합계
   Map<DateTime, int> getWeeklyLiquidStats(DateTime weekStart) {
     final result = <DateTime, int>{};
@@ -205,6 +216,20 @@ class DiaryProvider extends ChangeNotifier {
     for (int i = 0; i < 7; i++) {
       final day = _normalizeDate(weekStart.add(Duration(days: i)));
       result[day] = getDayNutrition(day).calories;
+    }
+    return result;
+  }
+
+  /// 주간 수유 시간 일별 분 합계 (모유/분유/유축수유/우유)
+  Map<DateTime, int> getWeeklyFeedingDurationStats(DateTime weekStart) {
+    final result = <DateTime, int>{};
+    for (int i = 0; i < 7; i++) {
+      final day = _normalizeDate(weekStart.add(Duration(days: i)));
+      final total = getEntriesForDate(day)
+          .where((e) =>
+              e.entryType.isMilkFeedingEntry && e.durationMinutes != null)
+          .fold(0, (sum, e) => sum + e.durationMinutes!);
+      result[day] = total;
     }
     return result;
   }

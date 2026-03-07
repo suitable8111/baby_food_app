@@ -232,7 +232,7 @@ class RecipeCard extends StatelessWidget {
 
   Widget _buildAssetOrPlaceholder() {
     return Image.asset(
-      'assets/images/recipes/${recipe.name}.png',
+      'assets/images/recipes/${recipe.id}.png',
       fit: BoxFit.cover,
       errorBuilder: (context, error, stackTrace) => Center(
         child: Icon(

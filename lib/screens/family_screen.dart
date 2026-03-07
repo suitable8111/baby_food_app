@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/family_invite.dart';
 import '../providers/auth_provider.dart';
 import '../services/firebase_service.dart';
+import 'family_chat_screen.dart';
 
 class FamilyScreen extends StatefulWidget {
   const FamilyScreen({super.key});
@@ -244,6 +245,24 @@ class _FamilyScreenState extends State<FamilyScreen> {
               style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
             ),
             const SizedBox(height: 16),
+            // 대화방 버튼
+            FilledButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FamilyChatScreen()),
+              ),
+              icon: const Icon(Icons.chat_bubble_rounded, size: 18),
+              label: const Text('가족 대화방'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF6BBF59),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 8),
             OutlinedButton.icon(
               onPressed: _unlinkPartner,
               icon: const Icon(Icons.link_off_rounded, size: 18),

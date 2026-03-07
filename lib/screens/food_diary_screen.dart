@@ -66,29 +66,32 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF6),
       appBar: AppBar(
-        title: GestureDetector(
-          onTap: () => _showCalendarSheet(diaryProvider),
-          onHorizontalDragEnd: (details) {
-            final dx = details.primaryVelocity ?? 0;
-            if (dx < -200) {
-              _moveDay(1, diaryProvider); // 오른쪽 → 다음날
-            } else if (dx > 200) {
-              _moveDay(-1, diaryProvider); // 왼쪽 → 전날
-            }
-          },
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.chevron_left_rounded, size: 20),
-              const SizedBox(width: 2),
-              Text(
-                DateFormat('yyyy년 M월 d일', 'ko').format(_selectedDay),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            GestureDetector(
+              onTap: () => _moveDay(-1, diaryProvider),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: Icon(Icons.chevron_left_rounded, size: 22),
               ),
-              const SizedBox(width: 2),
-              const Icon(Icons.chevron_right_rounded, size: 20),
-            ],
-          ),
+            ),
+            GestureDetector(
+              onTap: () => _showCalendarSheet(diaryProvider),
+              child: Text(
+                DateFormat('M월 d일 (E)', 'ko').format(_selectedDay),
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+            ),
+            GestureDetector(
+              onTap: () => _moveDay(1, diaryProvider),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: Icon(Icons.chevron_right_rounded, size: 22),
+              ),
+            ),
+          ],
         ),
         actions: [
           IconButton(
@@ -118,8 +121,8 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                 }
               },
               child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                reverseDuration: const Duration(milliseconds: 300),
+                duration: const Duration(milliseconds: 280),
+                reverseDuration: const Duration(milliseconds: 280),
                 layoutBuilder: (currentChild, previousChildren) => Stack(
                   alignment: Alignment.topCenter,
                   children: [
@@ -133,16 +136,15 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                   final begin = isEntering
                       ? Offset(_slideDirection, 0)
                       : Offset(-_slideDirection, 0);
-                  return SlideTransition(
-                    position: Tween<Offset>(
-                      begin: begin,
-                      end: Offset.zero,
-                    ).animate(CurvedAnimation(
-                      parent: animation,
-                      curve: Curves.easeOutCubic,
-                    )),
-                    child: FadeTransition(
-                      opacity: animation,
+                  return ClipRect(
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: begin,
+                        end: Offset.zero,
+                      ).animate(CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeInOutCubic,
+                      )),
                       child: child,
                     ),
                   );
@@ -874,20 +876,40 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
   }
 
   Widget _buildLiquidEntryInfo(FoodDiaryEntry entry) {
+    final mlText =
+        entry.entryType == EntryType.breastMilk && entry.milkAmountMl == null
+            ? '양 모름'
+            : '${entry.milkAmountMl ?? 0} ml';
+    final hasDuration = entry.entryType.isMilkFeedingEntry &&
+        entry.durationMinutes != null &&
+        entry.durationMinutes! > 0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildTypeChip(entry.entryType),
         const SizedBox(height: 6),
-        Text(
-          entry.entryType == EntryType.breastMilk && entry.milkAmountMl == null
-              ? '양 모름'
-              : '${entry.milkAmountMl ?? 0} ml',
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF2D2D2D),
-          ),
+        Row(
+          children: [
+            Text(
+              mlText,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF2D2D2D),
+              ),
+            ),
+            if (hasDuration) ...[
+              Text(
+                '  ·  ${entry.durationMinutes}분',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+            ],
+          ],
         ),
         if (entry.memo != null && entry.memo!.isNotEmpty) ...[
           const SizedBox(height: 4),
@@ -1318,6 +1340,21 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                             }),
                             onChange: (v) => setSheetState(
                                 () => selectedMl = int.tryParse(v)),
+                          ),
+                        ],
+
+                        if (type.isMilkFeedingEntry) ...[
+                          const SizedBox(height: 20),
+                          _buildFeedingDurationSection(
+                            entryType: type,
+                            selected: selectedDuration,
+                            controller: durationController,
+                            onSelect: (d) => setSheetState(() {
+                              selectedDuration = d;
+                              durationController.text = d.toString();
+                            }),
+                            onChange: (v) => setSheetState(
+                                () => selectedDuration = int.tryParse(v)),
                           ),
                         ],
 
@@ -1778,6 +1815,76 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
           decoration: InputDecoration(
             hintText: '직접 입력 (ml)',
             suffixText: 'ml',
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          onChanged: onChange,
+        ),
+      ],
+    );
+  }
+
+  // ── 수유 시간 입력 ──
+  Widget _buildFeedingDurationSection({
+    required EntryType entryType,
+    required int? selected,
+    required TextEditingController controller,
+    required void Function(int) onSelect,
+    required void Function(String) onChange,
+  }) {
+    const presets = [5, 10, 15, 20, 30, 45];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('수유 시간 (선택)',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: presets.map((min) {
+            final isSelected = selected == min;
+            return Material(
+              color: isSelected
+                  ? entryType.color
+                  : entryType.color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              child: InkWell(
+                onTap: () => onSelect(min),
+                borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  child: Text(
+                    '$min분',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : entryType.color,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            hintText: '직접 입력 (분)',
+            suffixText: '분',
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(

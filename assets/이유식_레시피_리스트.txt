@@ -1,0 +1,88 @@
+=====================================
+  이유식 레시피 리스트
+  (이미지 생성용 / 단계별 분류)
+=====================================
+
+★ 단계 기준
+  - 초기 (early)  : 4~6개월  → 미음·퓌레 (완전 액체~걸쭉한 페이스트)
+  - 중기 (middle) : 7~9개월  → 죽 (으깬 알갱이 약간)
+  - 후기 (late)   : 10~12개월 → 진밥·핑거푸드 (0.5cm 연한 덩어리)
+
+★ 이미지 형식 기준
+  - 배경: 밝고 따뜻한 흰색/크림색 배경
+  - 그릇: 파스텔톤 세라믹 이유식 그릇 (작고 납작한 형태)
+  - 스타일: 플랫레이 또는 살짝 위에서 내려다보는 구도
+  - 조명: 자연광, 부드럽고 따뜻한 톤
+
+-------------------------------------
+【 초기 이유식 (early) - 미음·퓌레 】
+-------------------------------------
+레시피명            | 주재료            | 색상        | 농도·질감          | 이미지 키워드
+쌀미음              | 쌀                | 흰색         | 묽은 액체, 광택    | white rice porridge, smooth, creamy, baby food bowl
+당근 쌀미음         | 쌀, 당근          | 주황빛 크림   | 부드러운 미음      | orange cream porridge, carrot, smooth baby puree
+고구마 퓌레         | 고구마            | 진한 주황     | 걸쭉한 페이스트    | sweet potato puree, deep orange, thick, smooth paste
+감자 퓌레           | 감자, 올리브오일  | 크림 화이트   | 크리미 페이스트    | potato puree, creamy white, mashed, baby food
+사과 퓌레           | 사과              | 연한 노란빛   | 부드러운 페이스트  | apple puree, pale yellow, smooth, fresh baby food
+바나나 퓌레         | 바나나            | 밝은 노란색   | 부드러운 으깸      | banana puree, bright yellow, creamy mash, baby spoon
+애호박 미음         | 쌀, 애호박        | 연한 연두     | 부드러운 미음      | zucchini rice porridge, pale green, smooth, baby bowl
+단호박 미음         | 쌀, 단호박        | 밝은 노란주황 | 부드러운 미음      | kabocha pumpkin porridge, golden orange, smooth
+브로콜리 미음       | 쌀, 브로콜리      | 연한 초록     | 부드러운 미음      | broccoli rice puree, light green, smooth, healthy
+소고기 미음         | 쌀, 소고기        | 베이지 크림   | 부드러운 미음      | beef rice porridge, beige, smooth, iron-rich baby food
+닭고기 미음         | 쌀, 닭가슴살      | 크림 화이트   | 부드러운 미음      | chicken rice porridge, pale cream, smooth, baby food
+찹쌀 미음           | 찹쌀              | 흰색 광택     | 점도 높은 미음     | glutinous rice porridge, glossy white, thick smooth
+배 퓌레             | 배                | 투명 연노랑   | 매끄러운 페이스트  | pear puree, translucent pale yellow, smooth gel
+아보카도 퓌레       | 아보카도          | 연한 초록     | 크리미 페이스트    | avocado puree, pale green, creamy, smooth, baby bowl
+
+-------------------------------------
+【 중기 이유식 (middle) - 죽 】
+-------------------------------------
+레시피명               | 주재료                    | 색상           | 농도·질감             | 이미지 키워드
+닭고기 야채죽          | 쌀, 닭고기, 당근, 애호박  | 노란빛 크림     | 알갱이 있는 죽        | chicken vegetable porridge, creamy yellow, chunky, baby bowl
+소고기 시금치죽        | 쌀, 소고기, 시금치        | 초록빛 베이지   | 알갱이 있는 죽        | beef spinach porridge, green flecked beige, chunky, nutritious
+두부 야채죽            | 쌀, 두부, 브로콜리, 당근  | 크림 화이트     | 두부 조각 있는 죽     | tofu vegetable porridge, creamy with green red chunks, baby food
+달걀 노른자죽          | 쌀, 달걀노른자, 당근      | 노란 황금색     | 부드러운 죽           | egg yolk porridge, golden yellow, smooth chunky, baby bowl
+소고기 양배추 당근죽   | 쌀, 소고기, 양배추, 당근  | 베이지 주황     | 다진 재료 죽          | beef cabbage carrot porridge, beige orange, minced ingredients
+소고기 브로콜리죽      | 쌀, 소고기, 브로콜리      | 초록빛 베이지   | 죽                    | beef broccoli porridge, beige with green, nutritious chunky baby food
+닭고기 단호박 청경채죽 | 쌀, 닭고기, 단호박, 청경채 | 황금빛 주황    | 죽                    | chicken kabocha bok choy porridge, golden with green, chunky
+대구살 감자죽          | 쌀, 대구, 감자            | 크림 화이트     | 부드러운 죽           | cod potato porridge, creamy white, flaked fish, gentle baby food
+표고버섯 소고기죽      | 쌀, 소고기, 표고버섯      | 진한 베이지     | 감칠맛 죽             | shiitake beef porridge, dark beige, mushroom pieces, umami
+렌틸콩 당근죽          | 쌀, 렌틸콩, 당근          | 주황빛 갈색     | 렌틸 죽               | lentil carrot porridge, orange brown, hearty, plant protein
+오트밀 바나나죽        | 오트밀, 바나나            | 크림 노란       | 부드러운 오트밀       | oatmeal banana porridge, creamy yellow, smooth oat, banana swirl
+닭고기 고구마 치즈죽   | 쌀, 닭고기, 고구마, 치즈  | 황금빛 크림     | 치즈 녹은 죽          | chicken sweet potato cheese porridge, golden creamy, melted cheese
+시금치 닭고기죽        | 쌀, 닭고기, 시금치, 당근  | 초록 베이지     | 알갱이 있는 죽        | spinach chicken porridge, green flecked, chunky, vibrant healthy
+
+-------------------------------------
+【 후기 이유식 (late) - 진밥·핑거푸드 】
+-------------------------------------
+레시피명                  | 주재료                         | 색상           | 형태·질감             | 이미지 키워드
+연어 야채 진밥            | 쌀, 연어, 브로콜리, 당근       | 분홍빛 밥      | 알갱이 있는 진밥       | salmon vegetable soft rice, pink flakes, green red, baby bowl
+소고기 단호박 진밥        | 쌀, 소고기, 단호박, 시금치     | 황금빛 밥      | 진밥                   | beef kabocha soft rice, golden orange chunks, green spinach
+치즈 야채 오트밀          | 오트밀, 치즈, 브로콜리, 당근   | 크림 노란       | 오트밀 죽              | cheese vegetable oatmeal, creamy yellow, green red chunks, melted
+요거트 과일 볼            | 요거트, 바나나, 사과           | 흰색 + 과일색  | 요거트에 과일 토핑     | yogurt fruit bowl, white creamy, colorful fruit pieces, healthy snack
+소고기 버섯 야채 진밥     | 쌀, 소고기, 표고버섯, 애호박   | 갈색빛 밥      | 진밥                   | beef mushroom vegetable rice, brown earthy, mushroom pieces, soft
+닭고기 단호박 청경채 진밥 | 쌀, 닭고기, 단호박, 청경채     | 황금빛 초록     | 진밥                   | chicken kabocha bok choy rice, golden green, colorful soft rice
+연어 파프리카 야채 진밥   | 쌀, 연어, 파프리카, 애호박     | 알록달록        | 진밥                   | salmon bell pepper vegetable rice, colorful, red orange green
+소고기 두부 야채 진밥     | 쌀, 소고기, 두부, 애호박       | 베이지 크림     | 두부 조각 진밥         | beef tofu vegetable rice, beige cream, tofu white chunks, soft
+돼지고기 감자 진밥        | 쌀, 돼지고기, 감자, 시금치     | 크림 베이지     | 진밥                   | pork potato soft rice, creamy beige, tender pieces, baby bowl
+소고기 시금치 치즈 진밥   | 쌀, 소고기, 시금치, 치즈       | 초록빛 크림     | 치즈 녹은 진밥         | beef spinach cheese rice, green cream, melted cheese, savory
+닭고기 토마토 오트밀      | 오트밀, 닭고기, 토마토, 브로콜리 | 붉은빛 오트밀 | 오트밀 죽              | chicken tomato oatmeal, reddish warm, lycopene, chunky oat bowl
+바나나 오트밀 팬케이크    | 오트밀, 바나나, 달걀           | 황금빛 갈색     | 동글납작 팬케이크       | banana oatmeal pancake, golden brown, small round, finger food
+고구마 바나나 볼          | 고구마, 바나나, 감자전분        | 따뜻한 주황     | 작은 동글볼 (2cm)      | sweet potato banana balls, warm orange, round bite-size, finger food
+
+=====================================
+【 이미지 생성 프롬프트 기본 템플릿 】
+=====================================
+"[레시피명] baby food, [색상] color, [질감], served in a small pastel ceramic bowl,
+top-down view, soft natural lighting, clean white background, warm cozy aesthetic,
+food photography style, no text, realistic"
+
+예시:
+"당근 쌀미음 baby food, orange cream color, smooth liquid puree,
+served in a small pastel ceramic bowl, top-down view, soft natural lighting,
+clean white background, warm cozy aesthetic, food photography style, no text, realistic"
+
+=====================================
+  초기: 14개  /  중기: 13개  /  후기: 13개
+  총 레시피: 40개
+  assets/images/recipes/ 경로에 [레시피명].png 로 저장
+=====================================

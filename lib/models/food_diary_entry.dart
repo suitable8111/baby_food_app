@@ -204,6 +204,14 @@ extension EntryTypeExtension on EntryType {
         EntryType.tummyTime,
       }.contains(this);
 
+  /// 수유 시간 기록 대상 (모유/분유/유축수유/우유)
+  bool get isMilkFeedingEntry => const {
+        EntryType.breastMilk,
+        EntryType.formulaMilk,
+        EntryType.pumpedMilk,
+        EntryType.cowMilk,
+      }.contains(this);
+
   /// 이유식 영양 추적 대상
   bool get isNutritionEntry => this == EntryType.food;
 }
