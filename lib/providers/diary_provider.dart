@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/food_diary_entry.dart';
 import '../models/nutrition.dart';
 import '../services/firebase_service.dart';
+import '../services/widget_service.dart';
 
 class DiaryProvider extends ChangeNotifier {
   final FirebaseService _firebaseService;
@@ -253,6 +254,10 @@ class DiaryProvider extends ChangeNotifier {
   // ==================== CRUD ====================
 
   /// 일지 추가
+  // 위젯에 표시할 아기 이름 (외부에서 설정)
+  String _babyName = '우리아이';
+  void setBabyName(String name) => _babyName = name;
+
   Future<bool> addEntry(FoodDiaryEntry entry) async {
     try {
       final docId = await _firebaseService.addDiaryEntry(entry);
@@ -260,6 +265,7 @@ class DiaryProvider extends ChangeNotifier {
       final key = _normalizeDate(entry.date);
       _entries.putIfAbsent(key, () => []).add(saved);
       notifyListeners();
+      _updateWidget(entry.date);
       return true;
     } catch (e) {
       debugPrint('일지 추가 실패: $e');
@@ -278,6 +284,7 @@ class DiaryProvider extends ChangeNotifier {
         if (idx >= 0) list[idx] = entry;
       }
       notifyListeners();
+      _updateWidget(entry.date);
       return true;
     } catch (e) {
       debugPrint('일지 수정 실패: $e');
@@ -295,10 +302,22 @@ class DiaryProvider extends ChangeNotifier {
         _entries.remove(key);
       }
       notifyListeners();
+      _updateWidget(date);
       return true;
     } catch (e) {
       debugPrint('일지 삭제 실패: $e');
       return false;
+    }
+  }
+
+  /// 오늘 날짜일 때만 위젯 업데이트
+  void _updateWidget(DateTime date) {
+    final today = _normalizeDate(DateTime.now());
+    if (_normalizeDate(date) == today) {
+      WidgetService.updateTodayStats(
+        getEntriesForDate(today),
+        babyName: _babyName,
+      );
     }
   }
 }

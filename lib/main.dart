@@ -8,6 +8,7 @@ import 'providers/recipe_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/diary_provider.dart';
 import 'screens/auth_wrapper.dart';
+import 'services/widget_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +21,9 @@ void main() async {
   } catch (e) {
     debugPrint('Firebase 초기화 실패: $e');
   }
+
+  // 홈 위젯 초기화
+  await WidgetService.init();
 
   runApp(const BabyFoodApp());
 }

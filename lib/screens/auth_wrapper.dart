@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/diary_provider.dart';
 import 'auth_screen.dart';
 import 'home_screen.dart';
 
@@ -9,9 +10,15 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authStatus = context.watch<AuthProvider>().status;
+    final authProvider = context.watch<AuthProvider>();
 
-    switch (authStatus) {
+    // 아기 이름을 DiaryProvider에 동기화 (위젯 표시용)
+    final babyName = authProvider.userProfile?.babyName;
+    if (babyName != null && babyName.isNotEmpty) {
+      context.read<DiaryProvider>().setBabyName(babyName);
+    }
+
+    switch (authProvider.status) {
       case AuthStatus.initial:
         return const Scaffold(
           body: Center(
