@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/food_diary_entry.dart';
 import '../models/nutrition.dart';
@@ -13,6 +14,8 @@ class DiaryProvider extends ChangeNotifier {
   final Map<DateTime, List<FoodDiaryEntry>> _entries = {};
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
+
+  StreamSubscription<List<FoodDiaryEntry>>? _todayStream;
 
   // Getters
   Map<DateTime, List<FoodDiaryEntry>> get entries => _entries;
@@ -33,7 +36,6 @@ class DiaryProvider extends ChangeNotifier {
   /// 해당 월 데이터 로드 (familyId 기준)
   Future<void> loadEntries(String familyId, DateTime month) async {
     _isLoading = true;
-    _entries.clear();
     notifyListeners();
 
     try {
@@ -42,10 +44,14 @@ class DiaryProvider extends ChangeNotifier {
 
       final list = await _firebaseService.getDiaryEntries(familyId, start, end);
 
+      // 임시 맵에 먼저 조립한 뒤 한 번에 교체 (스트림과 race condition 방지)
+      final tempMap = <DateTime, List<FoodDiaryEntry>>{};
       for (final entry in list) {
         final key = _normalizeDate(entry.date);
-        _entries.putIfAbsent(key, () => []).add(entry);
+        tempMap.putIfAbsent(key, () => []).add(entry);
       }
+      _entries.clear();
+      _entries.addAll(tempMap);
     } catch (e) {
       debugPrint('일지 로드 실패: $e');
     }
@@ -57,11 +63,11 @@ class DiaryProvider extends ChangeNotifier {
   /// 주간 데이터 로드 (월 경계 처리)
   Future<void> loadWeeklyEntries(String familyId, DateTime weekStart) async {
     _isLoading = true;
-    _entries.clear();
     notifyListeners();
 
     try {
       final weekEnd = weekStart.add(const Duration(days: 6));
+      final tempMap = <DateTime, List<FoodDiaryEntry>>{};
 
       // 시작 월 로드
       final startMonthStart = DateTime(weekStart.year, weekStart.month, 1);
@@ -70,7 +76,7 @@ class DiaryProvider extends ChangeNotifier {
           familyId, startMonthStart, startMonthEnd);
       for (final entry in list1) {
         final key = _normalizeDate(entry.date);
-        _entries.putIfAbsent(key, () => []).add(entry);
+        tempMap.putIfAbsent(key, () => []).add(entry);
       }
 
       // 주가 월 경계에 걸치면 끝 월도 로드
@@ -81,9 +87,12 @@ class DiaryProvider extends ChangeNotifier {
             familyId, endMonthStart, endMonthEnd);
         for (final entry in list2) {
           final key = _normalizeDate(entry.date);
-          _entries.putIfAbsent(key, () => []).add(entry);
+          tempMap.putIfAbsent(key, () => []).add(entry);
         }
       }
+
+      _entries.clear();
+      _entries.addAll(tempMap);
     } catch (e) {
       debugPrint('주간 일지 로드 실패: $e');
     }
@@ -95,7 +104,12 @@ class DiaryProvider extends ChangeNotifier {
   /// 선택된 날짜의 엔트리 리스트
   List<FoodDiaryEntry> getEntriesForDate(DateTime date) {
     final key = _normalizeDate(date);
-    final list = List<FoodDiaryEntry>.from(_entries[key] ?? []);
+    final raw = _entries[key] ?? [];
+    // ID 기반 중복 제거 (방어 코드)
+    final seen = <String>{};
+    final list = raw
+        .where((e) => e.id.isEmpty || seen.add(e.id))
+        .toList();
     list.sort((a, b) => a.mealTime.compareTo(b.mealTime));
     return list;
   }
@@ -183,13 +197,39 @@ class DiaryProvider extends ChangeNotifier {
     return result;
   }
 
-  /// 주간 기저귀 일별 횟수
+  /// 주간 기저귀 일별 횟수 (전체)
   Map<DateTime, int> getWeeklyDiaperStats(DateTime weekStart) {
     final result = <DateTime, int>{};
     for (int i = 0; i < 7; i++) {
       final day = _normalizeDate(weekStart.add(Duration(days: i)));
       result[day] =
           getEntriesForDate(day).where((e) => e.entryType == EntryType.diaper).length;
+    }
+    return result;
+  }
+
+  /// 주간 소변 기저귀 일별 횟수 (wet + both)
+  Map<DateTime, int> getWeeklyPeeStats(DateTime weekStart) {
+    final result = <DateTime, int>{};
+    for (int i = 0; i < 7; i++) {
+      final day = _normalizeDate(weekStart.add(Duration(days: i)));
+      result[day] = getEntriesForDate(day).where((e) =>
+          e.entryType == EntryType.diaper &&
+          (e.diaperType == DiaperType.wet ||
+              e.diaperType == DiaperType.both)).length;
+    }
+    return result;
+  }
+
+  /// 주간 대변 기저귀 일별 횟수 (soiled + both)
+  Map<DateTime, int> getWeeklyPoopStats(DateTime weekStart) {
+    final result = <DateTime, int>{};
+    for (int i = 0; i < 7; i++) {
+      final day = _normalizeDate(weekStart.add(Duration(days: i)));
+      result[day] = getEntriesForDate(day).where((e) =>
+          e.entryType == EntryType.diaper &&
+          (e.diaperType == DiaperType.soiled ||
+              e.diaperType == DiaperType.both)).length;
     }
     return result;
   }
@@ -257,6 +297,33 @@ class DiaryProvider extends ChangeNotifier {
   // 위젯에 표시할 아기 이름 (외부에서 설정)
   String _babyName = '우리아이';
   void setBabyName(String name) => _babyName = name;
+
+  /// 오늘 데이터 실시간 감지 시작 (파트너 변경도 자동 반영)
+  void startTodayStream(String familyId) {
+    _todayStream?.cancel();
+    _todayStream = _firebaseService.streamTodayEntries(familyId).listen(
+      (todayEntries) {
+        // 오늘 날짜 캐시 갱신
+        final today = _normalizeDate(DateTime.now());
+        _entries[today] = todayEntries;
+        notifyListeners();
+        // 위젯 업데이트
+        WidgetService.updateTodayStats(todayEntries, babyName: _babyName);
+      },
+      onError: (e) => debugPrint('오늘 스트림 오류: $e'),
+    );
+  }
+
+  void stopTodayStream() {
+    _todayStream?.cancel();
+    _todayStream = null;
+  }
+
+  @override
+  void dispose() {
+    _todayStream?.cancel();
+    super.dispose();
+  }
 
   Future<bool> addEntry(FoodDiaryEntry entry) async {
     try {

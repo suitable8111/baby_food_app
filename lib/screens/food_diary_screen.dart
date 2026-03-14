@@ -19,11 +19,50 @@ class FoodDiaryScreen extends StatefulWidget {
   State<FoodDiaryScreen> createState() => _FoodDiaryScreenState();
 }
 
+// 카테고리 필터 정의
+enum _DiaryFilter {
+  all('전체'),
+  feeding('🍼 수유'),
+  food('🥣 이유식'),
+  diaper('🚼 기저귀'),
+  sleep('💤 수면'),
+  activity('🎮 활동'),
+  health('🌡 건강');
+
+  const _DiaryFilter(this.label);
+  final String label;
+
+  bool matches(EntryType type) {
+    switch (this) {
+      case _DiaryFilter.all:
+        return true;
+      case _DiaryFilter.feeding:
+        return type.isLiquidEntry || type == EntryType.pumping;
+      case _DiaryFilter.food:
+        return type == EntryType.food || type == EntryType.snackFood;
+      case _DiaryFilter.diaper:
+        return type == EntryType.diaper;
+      case _DiaryFilter.sleep:
+        return type == EntryType.sleep;
+      case _DiaryFilter.activity:
+        return type == EntryType.play || type == EntryType.tummyTime;
+      case _DiaryFilter.health:
+        return type == EntryType.temperature ||
+            type == EntryType.medication ||
+            type == EntryType.hospital ||
+            type == EntryType.bath ||
+            type == EntryType.other;
+    }
+  }
+}
+
 class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
   CalendarFormat _calendarFormat = CalendarFormat.week;
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
   double _slideDirection = 0.0; // 1.0 = 다음날(왼쪽으로), -1.0 = 이전날(오른쪽으로)
+  _DiaryFilter _activeFilter = _DiaryFilter.all;
+  bool _fabExpanded = false;
 
   @override
   void initState() {
@@ -63,7 +102,9 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     final dayNutrition = diaryProvider.getDayNutrition(_selectedDay);
     final babyAgeMonths = authProvider.userProfile?.babyAgeMonths ?? 6;
 
-    return Scaffold(
+    return GestureDetector(
+      onTap: () { if (_fabExpanded) setState(() => _fabExpanded = false); },
+      child: Scaffold(
       backgroundColor: const Color(0xFFF8FAF6),
       appBar: AppBar(
         title: Row(
@@ -187,30 +228,46 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
+                    // 카테고리 필터 칩
+                    _buildFilterChips(selectedEntries),
+                    const SizedBox(height: 8),
                     // 영양 요약 카드 (이유식 엔트리가 있을 때만)
                     if (selectedEntries.any((e) => e.entryType.isNutritionEntry))
                       _buildNutritionCard(
                           dayNutrition, babyAgeMonths, diaryProvider),
                     const SizedBox(height: 8),
-                    // 타임라인
-                    if (selectedEntries.isEmpty)
-                      _buildEmptyState()
-                    else
-                      ...selectedEntries
-                          .map((entry) => _buildTimelineItem(entry)),
+                    // 타임라인 (필터 적용)
+                    Builder(builder: (_) {
+                      final filtered = selectedEntries
+                          .where((e) => _activeFilter.matches(e.entryType))
+                          .toList();
+                      if (selectedEntries.isEmpty) return _buildEmptyState();
+                      if (filtered.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 32, horizontal: 20),
+                          child: Center(
+                            child: Text(
+                              '${_activeFilter.label} 기록이 없어요',
+                              style: TextStyle(
+                                  color: Colors.grey.shade400, fontSize: 14),
+                            ),
+                          ),
+                        );
+                      }
+                      return Column(
+                        children: filtered
+                            .map((entry) => _buildTimelineItem(entry))
+                            .toList(),
+                      );
+                    }),
                   ],
                 ),
               ),
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddEntrySheet(context),
-        backgroundColor: const Color(0xFFFF7043),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('기록 추가',
-            style: TextStyle(fontWeight: FontWeight.w600)),
-      ),
+      floatingActionButton: _buildSpeedDial(),
+    ),
     );
   }
 
@@ -548,6 +605,228 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
             ],
           );
         }),
+      ),
+    );
+  }
+
+  // ====== 퀵 기록 (즉시 저장) ======
+  Future<void> _quickAdd(EntryType type, {DiaperType? diaperType}) async {
+    final authProvider = context.read<AuthProvider>();
+    final diaryProvider = context.read<DiaryProvider>();
+    if (authProvider.userId == null) return;
+
+    setState(() => _fabExpanded = false);
+
+    final now = DateTime.now();
+    final mealTime = DateTime(
+      _selectedDay.year,
+      _selectedDay.month,
+      _selectedDay.day,
+      now.hour,
+      now.minute,
+    );
+
+    // 시간대 기반 MealType 자동 결정
+    MealType mealType;
+    final h = now.hour;
+    if (h < 10) {
+      mealType = MealType.breakfast;
+    } else if (h < 14) {
+      mealType = MealType.lunch;
+    } else if (h < 18) {
+      mealType = MealType.snack;
+    } else {
+      mealType = MealType.dinner;
+    }
+
+    final entry = FoodDiaryEntry(
+      id: '',
+      userId: authProvider.userId!,
+      familyId: authProvider.familyId,
+      authorName: authProvider.displayName,
+      date: DateTime(_selectedDay.year, _selectedDay.month, _selectedDay.day),
+      entryType: type,
+      mealType: mealType,
+      mealTime: mealTime,
+      recipeId: '',
+      recipeName: type.displayName,
+      recipeStage: BabyFoodStage.early,
+      nutrition: Nutrition.empty,
+      diaperType: diaperType,
+    );
+
+    final success = await diaryProvider.addEntry(entry);
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${type.displayName} 기록이 추가되었습니다')),
+      );
+    }
+  }
+
+  // ====== Speed Dial FAB ======
+  Widget _buildSpeedDial() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        // 확장 메뉴 (수유, 기저귀 퀵버튼)
+        AnimatedSlide(
+          offset: _fabExpanded ? Offset.zero : const Offset(0, 0.3),
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          child: AnimatedOpacity(
+            opacity: _fabExpanded ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 150),
+            child: IgnorePointer(
+              ignoring: !_fabExpanded,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _buildQuickFab(
+                    label: '🤱 모유 빠른기록',
+                    color: const Color(0xFFF48FB1),
+                    onTap: () => _quickAdd(EntryType.breastMilk),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildQuickFab(
+                    label: '🍼 수유 빠른기록',
+                    color: const Color(0xFF29B6F6),
+                    onTap: () => _quickAdd(EntryType.formulaMilk),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildQuickFab(
+                    label: '💧 기저귀(소변) 빠른기록',
+                    color: const Color(0xFF4FC3F7),
+                    onTap: () => _quickAdd(EntryType.diaper,
+                        diaperType: DiaperType.wet),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildQuickFab(
+                    label: '💩 기저귀(대변) 빠른기록',
+                    color: const Color(0xFF8D6E63),
+                    onTap: () => _quickAdd(EntryType.diaper,
+                        diaperType: DiaperType.soiled),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildQuickFab(
+                    label: '📝 전체 기록',
+                    color: const Color(0xFF6BBF59),
+                    onTap: () {
+                      setState(() => _fabExpanded = false);
+                      _showAddEntrySheet(context);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // 메인 FAB
+        FloatingActionButton(
+          onPressed: () => setState(() => _fabExpanded = !_fabExpanded),
+          backgroundColor: const Color(0xFFFF7043),
+          foregroundColor: Colors.white,
+          elevation: 4,
+          child: AnimatedRotation(
+            turns: _fabExpanded ? 0.125 : 0,
+            duration: const Duration(milliseconds: 200),
+            child: const Icon(Icons.add_rounded, size: 28),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickFab({
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ====== 카테고리 필터 칩 ======
+  Widget _buildFilterChips(List<FoodDiaryEntry> allEntries) {
+    // 해당 날짜에 기록이 있는 카테고리만 활성화
+    final activeFilters = _DiaryFilter.values.where((f) {
+      if (f == _DiaryFilter.all) return true;
+      return allEntries.any((e) => f.matches(e.entryType));
+    }).toList();
+
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: activeFilters.length,
+        separatorBuilder: (_, i) => const SizedBox(width: 6),
+        itemBuilder: (_, i) {
+          final filter = activeFilters[i];
+          final isSelected = _activeFilter == filter;
+          return GestureDetector(
+            onTap: () => setState(() => _activeFilter = filter),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? const Color(0xFF6BBF59)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected
+                      ? const Color(0xFF6BBF59)
+                      : Colors.grey.shade200,
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFF6BBF59).withValues(alpha: 0.25),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        )
+                      ]
+                    : null,
+              ),
+              child: Text(
+                filter.label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : Colors.grey.shade600,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1108,13 +1387,13 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
 
   // ====== 기록 추가/수정 바텀시트 ======
   void _showAddEntrySheet(BuildContext outerContext,
-      {FoodDiaryEntry? entryToEdit}) {
+      {FoodDiaryEntry? entryToEdit, EntryType? initialType}) {
     final isEditing = entryToEdit != null;
     final recipeProviderForInit =
         isEditing ? outerContext.read<RecipeProvider>() : null;
 
     EntryType selectedEntryType =
-        entryToEdit?.entryType ?? EntryType.formulaMilk;
+        entryToEdit?.entryType ?? initialType ?? EntryType.formulaMilk;
     MealType selectedMealType = entryToEdit?.mealType ?? MealType.breakfast;
     TimeOfDay selectedTime = entryToEdit != null
         ? TimeOfDay.fromDateTime(entryToEdit.mealTime)

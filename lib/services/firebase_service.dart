@@ -466,6 +466,25 @@ class FirebaseService {
     return list;
   }
 
+  /// 오늘 일지 실시간 스트림 (familyId 기준)
+  Stream<List<FoodDiaryEntry>> streamTodayEntries(String familyId) {
+    final today = DateTime.now();
+    final start = DateTime(today.year, today.month, today.day);
+    final end = start.add(const Duration(days: 1));
+
+    return _foodDiaryRef
+        .where('familyId', isEqualTo: familyId)
+        .snapshots()
+        .map((snapshot) {
+      final list = snapshot.docs
+          .map((doc) => FoodDiaryEntry.fromFirestore(doc))
+          .where((e) => !e.date.isBefore(start) && e.date.isBefore(end))
+          .toList();
+      list.sort((a, b) => a.mealTime.compareTo(b.mealTime));
+      return list;
+    });
+  }
+
   /// 일지 엔트리 수정
   Future<void> updateDiaryEntry(String entryId, Map<String, dynamic> data) async {
     await _foodDiaryRef.doc(entryId).update(data);

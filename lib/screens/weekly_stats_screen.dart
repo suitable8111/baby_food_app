@@ -65,14 +65,19 @@ class _WeeklyStatsScreenState extends State<WeeklyStatsScreen> {
     final liquidCountStats = diary.getWeeklyLiquidCountStats(_weekStart);
     final sleepStats = diary.getWeeklySleepStats(_weekStart);
     final diaperStats = diary.getWeeklyDiaperStats(_weekStart);
+    final peeStats = diary.getWeeklyPeeStats(_weekStart);
+    final poopStats = diary.getWeeklyPoopStats(_weekStart);
     final tempStats = diary.getWeeklyTemperatureStats(_weekStart);
     final activityStats = diary.getWeeklyActivityStats(_weekStart);
     final caloriesStats = diary.getWeeklyCaloriesStats(_weekStart);
     final feedingDurationStats = diary.getWeeklyFeedingDurationStats(_weekStart);
 
     final totalLiquidMl = liquidStats.values.fold(0, (a, b) => a + b);
+    final totalLiquidCount = liquidCountStats.values.fold(0, (a, b) => a + b);
     final totalSleepMin = sleepStats.values.fold(0, (a, b) => a + b);
     final totalDiapers = diaperStats.values.fold(0, (a, b) => a + b);
+    final totalPee = peeStats.values.fold(0, (a, b) => a + b);
+    final totalPoop = poopStats.values.fold(0, (a, b) => a + b);
     final hasNutrition = caloriesStats.values.any((v) => v > 0);
 
     return Scaffold(
@@ -94,6 +99,7 @@ class _WeeklyStatsScreenState extends State<WeeklyStatsScreen> {
                     // 요약 카드
                     _buildSummaryRow(
                       totalLiquidMl: totalLiquidMl,
+                      totalLiquidCount: totalLiquidCount,
                       totalSleepMin: totalSleepMin,
                       totalDiapers: totalDiapers,
                     ),
@@ -103,8 +109,8 @@ class _WeeklyStatsScreenState extends State<WeeklyStatsScreen> {
                       _buildNutritionCard(diary),
                       const SizedBox(height: 16),
                     ],
-                    // 수유/음료 (ml 막대 + 횟수 선)
-                    if (liquidStats.values.any((v) => v > 0)) ...[
+                    // 수유/음료 (건수 있으면 표시)
+                    if (liquidCountStats.values.any((v) => v > 0)) ...[
                       _buildChartCard(
                         title: '수유 & 음료',
                         subtitle: '막대: 섭취량(ml)  ·  선: 횟수(회)',
@@ -149,20 +155,14 @@ class _WeeklyStatsScreenState extends State<WeeklyStatsScreen> {
                       ),
                       const SizedBox(height: 16),
                     ],
-                    // 기저귀
+                    // 기저귀 (소변/대변 분리)
                     if (diaperStats.values.any((v) => v > 0)) ...[
-                      _buildChartCard(
-                        title: '기저귀',
-                        subtitle: '일별 교체 횟수',
-                        icon: Icons.baby_changing_station_rounded,
-                        color: const Color(0xFFFFB74D),
-                        child: _buildBarChart(
-                          stats: diaperStats,
-                          color: const Color(0xFFFFB74D),
-                          unit: '회',
-                          maxY: _calcMaxY(diaperStats.values, 10),
-                          isCount: true,
-                        ),
+                      _buildDiaperCard(
+                        diaperStats: diaperStats,
+                        peeStats: peeStats,
+                        poopStats: poopStats,
+                        totalPee: totalPee,
+                        totalPoop: totalPoop,
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -501,6 +501,7 @@ class _WeeklyStatsScreenState extends State<WeeklyStatsScreen> {
 
   Widget _buildSummaryRow({
     required int totalLiquidMl,
+    required int totalLiquidCount,
     required int totalSleepMin,
     required int totalDiapers,
   }) {
@@ -531,9 +532,11 @@ class _WeeklyStatsScreenState extends State<WeeklyStatsScreen> {
         _buildSummaryCard(
           icon: Icons.local_cafe_rounded,
           color: const Color(0xFF29B6F6),
-          label: '총 수유/음료',
-          value: '${totalLiquidMl}ml',
-          avg: '평균 ${avgLiquidMl}ml/일',
+          label: '수유/음료',
+          value: totalLiquidMl > 0 ? '${totalLiquidMl}ml' : '$totalLiquidCount회',
+          avg: totalLiquidMl > 0
+              ? '$totalLiquidCount회 · 평균 ${avgLiquidMl}ml'
+              : '평균 ${(totalLiquidCount / 7).toStringAsFixed(1)}회/일',
         ),
         const SizedBox(width: 10),
         _buildSummaryCard(
@@ -552,6 +555,95 @@ class _WeeklyStatsScreenState extends State<WeeklyStatsScreen> {
           avg: '평균 $avgDiapers회/일',
         ),
       ],
+    );
+  }
+
+  // ====== 기저귀 소변/대변 분리 카드 ======
+  Widget _buildDiaperCard({
+    required Map<DateTime, int> diaperStats,
+    required Map<DateTime, int> peeStats,
+    required Map<DateTime, int> poopStats,
+    required int totalPee,
+    required int totalPoop,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 헤더
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFB74D).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.baby_changing_station_rounded,
+                    color: Color(0xFFFFB74D), size: 18),
+              ),
+              const SizedBox(width: 10),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('기저귀',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF2D2D2D))),
+                  Text('일별 교체 횟수',
+                      style: TextStyle(fontSize: 11, color: Colors.grey)),
+                ],
+              ),
+              const Spacer(),
+              // 소변/대변 합계 뱃지
+              Row(
+                children: [
+                  _buildDiaperBadge('💧 소변', totalPee, const Color(0xFF29B6F6)),
+                  const SizedBox(width: 6),
+                  _buildDiaperBadge('💩 대변', totalPoop, const Color(0xFF8D6E63)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // 차트
+          SizedBox(
+            height: 140,
+            child: _buildDiaperComboChart(
+              peeStats: peeStats,
+              poopStats: poopStats,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDiaperBadge(String label, int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        '$label $count회',
+        style: TextStyle(
+            fontSize: 11, fontWeight: FontWeight.w600, color: color),
+      ),
     );
   }
 
@@ -701,6 +793,134 @@ class _WeeklyStatsScreenState extends State<WeeklyStatsScreen> {
   }
 
   // ── 수유 콤보 차트: 막대(ml) + 선(횟수) ──
+  // 기저귀 소변(파랑)/대변(갈색) 그룹 막대 차트
+  Widget _buildDiaperComboChart({
+    required Map<DateTime, int> peeStats,
+    required Map<DateTime, int> poopStats,
+  }) {
+    final labels = _dayLabels();
+    final allValues = [...peeStats.values, ...poopStats.values];
+    final maxY = _calcMaxY(allValues, 5).toDouble();
+    const peeColor = Color(0xFF29B6F6);
+    const poopColor = Color(0xFF8D6E63);
+
+    final barGroups = List.generate(7, (i) {
+      final day = _normalizeDate(_weekStart.add(Duration(days: i)));
+      final pee = (peeStats[day] ?? 0).toDouble();
+      final poop = (poopStats[day] ?? 0).toDouble();
+      return BarChartGroupData(
+        x: i,
+        barsSpace: 3,
+        barRods: [
+          BarChartRodData(
+            toY: pee,
+            color: pee > 0 ? peeColor : peeColor.withValues(alpha: 0.15),
+            width: 14,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+          ),
+          BarChartRodData(
+            toY: poop,
+            color: poop > 0 ? poopColor : poopColor.withValues(alpha: 0.15),
+            width: 14,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+          ),
+        ],
+      );
+    });
+
+    return Column(
+      children: [
+        // 범례
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildLegendDot(peeColor, '💧 소변'),
+            const SizedBox(width: 16),
+            _buildLegendDot(poopColor, '💩 대변'),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: maxY,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipItem: (group, _, rod, rodIndex) {
+                    final val = rod.toY.toInt();
+                    if (val == 0) return null;
+                    final label = rodIndex == 0 ? '소변' : '대변';
+                    return BarTooltipItem(
+                      '$label ${val}회',
+                      const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600),
+                    );
+                  },
+                ),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false)),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 28,
+                    getTitlesWidget: (value, meta) {
+                      final idx = value.toInt();
+                      if (idx < 0 || idx >= labels.length) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(labels[idx],
+                            style: TextStyle(
+                                fontSize: 10, color: Colors.grey.shade500)),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: maxY > 4 ? (maxY / 4).ceilToDouble() : 1,
+                getDrawingHorizontalLine: (_) => FlLine(
+                  color: Colors.grey.shade100,
+                  strokeWidth: 1,
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              barGroups: barGroups,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLegendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(label,
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+      ],
+    );
+  }
+
   Widget _buildLiquidComboChart({
     required Map<DateTime, int> mlStats,
     required Map<DateTime, int> countStats,

@@ -54,7 +54,7 @@ struct Provider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BabyTrackerEntry>) -> Void) {
         let entry = BabyTrackerEntry(date: Date(), stats: BabyStats.load())
-        let next = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
+        let next = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
         completion(Timeline(entries: [entry], policy: .after(next)))
     }
 }
@@ -250,11 +250,14 @@ struct BabyTrackerWidgetEntryView: View {
     @Environment(\.widgetFamily) var family
 
     var body: some View {
-        switch family {
-        case .systemSmall:  SmallWidgetView(stats: entry.stats)
-        case .systemMedium: MediumWidgetView(stats: entry.stats)
-        default:            SmallWidgetView(stats: entry.stats)
+        Group {
+            switch family {
+            case .systemSmall:  SmallWidgetView(stats: entry.stats)
+            case .systemMedium: MediumWidgetView(stats: entry.stats)
+            default:            SmallWidgetView(stats: entry.stats)
+            }
         }
+        .widgetURL(URL(string: "babyfood://diary")!)
     }
 }
 

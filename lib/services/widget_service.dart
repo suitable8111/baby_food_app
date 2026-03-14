@@ -5,6 +5,7 @@ import '../models/food_diary_entry.dart';
 class WidgetService {
   static const _appGroupId = 'group.com.babyfood.babyFoodApp';
   static const _iOSWidgetName = 'BabyTrackerWidget';
+  static const _androidWidgetName = 'BabyTrackerWidget';
 
   static Future<void> init() async {
     try {
@@ -47,7 +48,10 @@ class WidgetService {
       await HomeWidget.saveWidgetData('babyName', babyName);
       await HomeWidget.saveWidgetData('lastUpdate', timeStr);
 
-      await HomeWidget.updateWidget(iOSName: _iOSWidgetName);
+      await HomeWidget.updateWidget(
+        iOSName: _iOSWidgetName,
+        androidName: _androidWidgetName,
+      );
     } catch (e) {
       debugPrint('위젯 업데이트 실패: $e');
     }

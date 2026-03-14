@@ -18,6 +18,7 @@ import 'shared_recipes_screen.dart';
 import 'board_screen.dart';
 import 'profile_screen.dart';
 import 'food_diary_screen.dart';
+import 'timeline_screen.dart';
 import 'family_screen.dart';
 import 'family_chat_screen.dart';
 
@@ -235,6 +236,18 @@ class HomeScreen extends StatelessWidget {
                     if (!isLoggedIn) { _showLoginRequired(context); return; }
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const FoodDiaryScreen()));
+                  },
+                ),
+                _DrawerMenuItem(
+                  icon: Icons.timeline_rounded,
+                  label: '타임라인',
+                  iconColor: const Color(0xFF7E57C2),
+                  indent: true,
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (!isLoggedIn) { _showLoginRequired(context); return; }
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const TimelineScreen()));
                   },
                 ),
                 _DrawerMenuItem(

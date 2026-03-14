@@ -51,6 +51,9 @@ dependencies:
   # 홈 화면 위젯
   home_widget: ^0.6.0
 
+  # 딥링크 (위젯 탭 → 앱 화면 이동)
+  app_links: ^6.3.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
