@@ -565,7 +565,7 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               child: Row(
                 children: [
                   Expanded(
@@ -580,7 +580,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: _QuickMenuCard(
                       icon: Icons.pie_chart_rounded,
@@ -591,6 +591,40 @@ class HomeScreen extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                             builder: (_) => const NutritionCalculatorScreen()),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _QuickMenuCard(
+                      icon: Icons.book_rounded,
+                      title: '우리아이 기록',
+                      subtitle: '이유식·수유 일지',
+                      gradient: const [Color(0xFF42A5F5), Color(0xFF1E88E5)],
+                      compact: true,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const FoodDiaryScreen()),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _QuickMenuCard(
+                      icon: Icons.timeline_rounded,
+                      title: '타임라인',
+                      subtitle: '24시간 기록',
+                      gradient: const [Color(0xFFAB47BC), Color(0xFF7B1FA2)],
+                      compact: true,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const TimelineScreen()),
                       ),
                     ),
                   ),
@@ -675,6 +709,7 @@ class _QuickMenuCard extends StatelessWidget {
   final String subtitle;
   final List<Color> gradient;
   final VoidCallback onTap;
+  final bool compact;
 
   const _QuickMenuCard({
     required this.icon,
@@ -682,10 +717,18 @@ class _QuickMenuCard extends StatelessWidget {
     required this.subtitle,
     required this.gradient,
     required this.onTap,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final iconSize = compact ? 36.0 : 44.0;
+    final iconInnerSize = compact ? 20.0 : 24.0;
+    final titleSize = compact ? 13.0 : 15.0;
+    final subtitleSize = compact ? 11.0 : 12.0;
+    final padding = compact ? 12.0 : 16.0;
+    final gap = compact ? 10.0 : 14.0;
+
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
@@ -693,26 +736,26 @@ class _QuickMenuCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(padding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: iconSize,
+                height: iconSize,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(colors: gradient),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(compact ? 10 : 12),
                 ),
-                child: Icon(icon, color: Colors.white, size: 24),
+                child: Icon(icon, color: Colors.white, size: iconInnerSize),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: gap),
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 15,
+                style: TextStyle(
+                  fontSize: titleSize,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF2D2D2D),
+                  color: const Color(0xFF2D2D2D),
                 ),
               ),
               const SizedBox(height: 2),
@@ -720,7 +763,7 @@ class _QuickMenuCard extends StatelessWidget {
                 subtitle,
                 style: TextStyle(
                   color: Colors.grey.shade500,
-                  fontSize: 12,
+                  fontSize: subtitleSize,
                 ),
               ),
             ],

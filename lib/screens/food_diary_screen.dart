@@ -64,6 +64,11 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
   _DiaryFilter _activeFilter = _DiaryFilter.all;
   bool _fabExpanded = false;
 
+  // 인라인 슬라이더 편집 상태
+  final Set<String> _expandedEntryIds = {};
+  final Map<String, int> _tempMl = {};
+  final Map<String, int> _tempDuration = {};
+
   @override
   void initState() {
     super.initState();
@@ -98,7 +103,9 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
   Widget build(BuildContext context) {
     final diaryProvider = context.watch<DiaryProvider>();
     final authProvider = context.watch<AuthProvider>();
-    final selectedEntries = diaryProvider.getEntriesForDate(_selectedDay);
+    final selectedEntries = diaryProvider.getEntriesForDate(_selectedDay)
+        .reversed
+        .toList();
     final dayNutrition = diaryProvider.getDayNutrition(_selectedDay);
     final babyAgeMonths = authProvider.userProfile?.babyAgeMonths ?? 6;
 
@@ -609,6 +616,149 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     );
   }
 
+  // ====== 인라인 슬라이더 편집 ======
+  void _toggleInlineEdit(FoodDiaryEntry entry) {
+    setState(() {
+      if (_expandedEntryIds.contains(entry.id)) {
+        _expandedEntryIds.remove(entry.id);
+      } else {
+        _expandedEntryIds.add(entry.id);
+        _tempMl[entry.id] = entry.milkAmountMl ?? 0;
+        _tempDuration[entry.id] = entry.durationMinutes ?? 0;
+      }
+    });
+  }
+
+  Future<void> _saveInlineEdit(FoodDiaryEntry entry) async {
+    final diaryProvider = context.read<DiaryProvider>();
+    final updated = entry.copyWith(
+      milkAmountMl: _tempMl[entry.id] ?? entry.milkAmountMl,
+      durationMinutes: _tempDuration[entry.id] ?? entry.durationMinutes,
+    );
+    await diaryProvider.updateEntry(updated);
+  }
+
+  Widget _buildInlineSliders(FoodDiaryEntry entry) {
+    final ml = (_tempMl[entry.id] ?? entry.milkAmountMl ?? 0).toDouble();
+    final dur = (_tempDuration[entry.id] ?? entry.durationMinutes ?? 0).toDouble();
+    final color = entry.entryType.color;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.04),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+      ),
+      child: Column(
+        children: [
+          Divider(color: color.withValues(alpha: 0.15), height: 1),
+          const SizedBox(height: 10),
+          // ml 슬라이더
+          Row(
+            children: [
+              Icon(Icons.water_drop_rounded, size: 16, color: color),
+              const SizedBox(width: 6),
+              Text(
+                '양',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SliderTheme(
+                  data: SliderThemeData(
+                    activeTrackColor: color,
+                    thumbColor: color,
+                    inactiveTrackColor: color.withValues(alpha: 0.2),
+                    overlayColor: color.withValues(alpha: 0.1),
+                    trackHeight: 3,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                  ),
+                  child: Slider(
+                    value: ml.clamp(0, 300),
+                    min: 0,
+                    max: 300,
+                    divisions: 60,
+                    onChanged: (v) =>
+                        setState(() => _tempMl[entry.id] = v.round()),
+                    onChangeEnd: (_) => _saveInlineEdit(entry),
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 52,
+                child: Text(
+                  '${ml.round()} ml',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ),
+            ],
+          ),
+          // 수유 시간 슬라이더 (모유/유축만)
+          if (entry.entryType.isMilkFeedingEntry) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.timer_outlined, size: 16, color: color),
+                const SizedBox(width: 6),
+                Text(
+                  '시간',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderThemeData(
+                      activeTrackColor: color,
+                      thumbColor: color,
+                      inactiveTrackColor: color.withValues(alpha: 0.2),
+                      overlayColor: color.withValues(alpha: 0.1),
+                      trackHeight: 3,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                    ),
+                    child: Slider(
+                      value: dur.clamp(0, 60),
+                      min: 0,
+                      max: 60,
+                      divisions: 60,
+                      onChanged: (v) =>
+                          setState(() => _tempDuration[entry.id] = v.round()),
+                      onChangeEnd: (_) => _saveInlineEdit(entry),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 52,
+                  child: Text(
+                    '${dur.round()}분',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   // ====== 퀵 기록 (즉시 저장) ======
   Future<void> _quickAdd(EntryType type, {DiaperType? diaperType}) async {
     final authProvider = context.read<AuthProvider>();
@@ -685,26 +835,26 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   _buildQuickFab(
-                    label: '🤱 모유 빠른기록',
+                    label: '🤱 모유',
                     color: const Color(0xFFF48FB1),
                     onTap: () => _quickAdd(EntryType.breastMilk),
                   ),
                   const SizedBox(height: 10),
                   _buildQuickFab(
-                    label: '🍼 수유 빠른기록',
+                    label: '🍼 수유',
                     color: const Color(0xFF29B6F6),
                     onTap: () => _quickAdd(EntryType.formulaMilk),
                   ),
                   const SizedBox(height: 10),
                   _buildQuickFab(
-                    label: '💧 기저귀(소변) 빠른기록',
+                    label: '💧 소변',
                     color: const Color(0xFF4FC3F7),
                     onTap: () => _quickAdd(EntryType.diaper,
                         diaperType: DiaperType.wet),
                   ),
                   const SizedBox(height: 10),
                   _buildQuickFab(
-                    label: '💩 기저귀(대변) 빠른기록',
+                    label: '💩 대변',
                     color: const Color(0xFF8D6E63),
                     onTap: () => _quickAdd(EntryType.diaper,
                         diaperType: DiaperType.soiled),
@@ -935,69 +1085,100 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              // 아이콘 + 시간
-              Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: entry.entryType.color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      entry.entryType.icon,
-                      color: entry.entryType.color,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    timeStr,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 14),
-              // 정보
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          children: [
+            InkWell(
+              borderRadius: entry.entryType.isLiquidEntry
+                  ? const BorderRadius.vertical(top: Radius.circular(16))
+                  : BorderRadius.circular(16),
+              onTap: entry.entryType.isLiquidEntry
+                  ? () => _toggleInlineEdit(entry)
+                  : null,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
                   children: [
-                    if (showAuthor)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          entry.authorName!,
+                    // 아이콘 + 시간
+                    Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: entry.entryType.color.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            entry.entryType.icon,
+                            color: entry.entryType.color,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          timeStr,
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade400,
+                            color: Colors.grey.shade600,
                           ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(width: 14),
+                    // 정보
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (showAuthor)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text(
+                                entry.authorName!,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade400,
+                                ),
+                              ),
+                            ),
+                          _buildEntryInfo(entry),
+                        ],
                       ),
-                    _buildEntryInfo(entry),
+                    ),
+                    // 수정 / 펼치기 버튼
+                    if (entry.entryType.isLiquidEntry)
+                      Icon(
+                        _expandedEntryIds.contains(entry.id)
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: 20,
+                        color: Colors.grey.shade400,
+                      )
+                    else
+                      IconButton(
+                        icon: Icon(Icons.edit_outlined,
+                            size: 18, color: Colors.grey.shade400),
+                        onPressed: () =>
+                            _showAddEntrySheet(context, entryToEdit: entry),
+                        constraints: const BoxConstraints(),
+                        padding: const EdgeInsets.all(6),
+                      ),
                   ],
                 ),
               ),
-              // 수정 버튼
-              IconButton(
-                icon: Icon(Icons.edit_outlined,
-                    size: 18, color: Colors.grey.shade400),
-                onPressed: () =>
-                    _showAddEntrySheet(context, entryToEdit: entry),
-                constraints: const BoxConstraints(),
-                padding: const EdgeInsets.all(6),
+            ),
+            // 인라인 슬라이더 패널 (수유/모유만)
+            if (entry.entryType.isLiquidEntry)
+              AnimatedCrossFade(
+                duration: const Duration(milliseconds: 200),
+                crossFadeState: _expandedEntryIds.contains(entry.id)
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                firstChild: const SizedBox.shrink(),
+                secondChild: _buildInlineSliders(entry),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );
