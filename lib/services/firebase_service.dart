@@ -9,6 +9,7 @@ import '../models/user_profile.dart';
 import '../models/food_diary_entry.dart';
 import '../models/family_invite.dart';
 import '../models/family_message.dart';
+import '../models/baby_milestone.dart';
 
 /// Firebase 서비스 클래스
 /// Firestore 데이터 CRUD 및 인증 관리
@@ -26,6 +27,7 @@ class FirebaseService {
   CollectionReference get _foodDiaryRef => _firestore.collection('food_diary');
   CollectionReference get _familyInvitesRef => _firestore.collection('family_invites');
   CollectionReference get _familyMessagesRef => _firestore.collection('family_messages');
+  CollectionReference get _milestonesRef => _firestore.collection('baby_milestones');
 
   // 현재 사용자
   User? get currentUser => _auth.currentUser;
@@ -673,5 +675,39 @@ class FirebaseService {
   /// 메시지 삭제 (작성자만)
   Future<void> deleteFamilyMessage(String messageId) async {
     await _familyMessagesRef.doc(messageId).delete();
+  }
+
+  // ==================== 아이 업적 (마일스톤) ====================
+
+  /// 마일스톤 저장 (familyId 문서에 병합)
+  Future<void> saveMilestone(String familyId, BabyMilestone milestone) async {
+    await _milestonesRef.doc(familyId).set(
+      {milestone.type.name: milestone.toJson()},
+      SetOptions(merge: true),
+    );
+  }
+
+  /// 마일스톤 삭제
+  Future<void> deleteMilestone(String familyId, MilestoneType type) async {
+    await _milestonesRef.doc(familyId).update({
+      type.name: FieldValue.delete(),
+    });
+  }
+
+  /// 마일스톤 전체 조회
+  Future<Map<MilestoneType, BabyMilestone>> getMilestones(String familyId) async {
+    final doc = await _milestonesRef.doc(familyId).get();
+    if (!doc.exists) return {};
+    final data = doc.data() as Map<String, dynamic>;
+    final result = <MilestoneType, BabyMilestone>{};
+    for (final type in MilestoneType.values) {
+      final entry = data[type.name];
+      if (entry != null && entry is Map<String, dynamic>) {
+        try {
+          result[type] = BabyMilestone.fromJson(type, entry);
+        } catch (_) {}
+      }
+    }
+    return result;
   }
 }

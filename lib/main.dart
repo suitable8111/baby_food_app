@@ -7,6 +7,7 @@ import 'services/firebase_service.dart';
 import 'providers/recipe_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/diary_provider.dart';
+import 'providers/milestone_provider.dart';
 import 'screens/auth_wrapper.dart';
 import 'services/widget_service.dart';
 
@@ -49,6 +50,9 @@ class BabyFoodApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<DiaryProvider>(
           create: (_) => DiaryProvider(firebaseService),
+        ),
+        ChangeNotifierProvider<MilestoneProvider>(
+          create: (_) => MilestoneProvider(firebaseService),
         ),
       ],
       child: MaterialApp(

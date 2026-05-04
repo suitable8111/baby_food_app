@@ -68,6 +68,7 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
   final Set<String> _expandedEntryIds = {};
   final Map<String, int> _tempMl = {};
   final Map<String, int> _tempDuration = {};
+  final Map<String, DateTime> _tempTime = {};
 
   @override
   void initState() {
@@ -623,28 +624,62 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
         _expandedEntryIds.remove(entry.id);
       } else {
         _expandedEntryIds.add(entry.id);
-        _tempMl[entry.id] = entry.milkAmountMl ?? 0;
-        _tempDuration[entry.id] = entry.durationMinutes ?? 0;
+        // 분할된 display 엔트리가 아닌 원본 값으로 초기화
+        final original = context.read<DiaryProvider>().getEntryById(entry.id) ?? entry;
+        _tempMl[entry.id] = original.milkAmountMl ?? 0;
+        _tempDuration[entry.id] = original.durationMinutes ?? 0;
+        _tempTime[entry.id] = original.mealTime;
       }
     });
   }
 
   Future<void> _saveInlineEdit(FoodDiaryEntry entry) async {
     final diaryProvider = context.read<DiaryProvider>();
+    final newTime = _tempTime[entry.id] ?? entry.mealTime;
     final updated = entry.copyWith(
       milkAmountMl: _tempMl[entry.id] ?? entry.milkAmountMl,
       durationMinutes: _tempDuration[entry.id] ?? entry.durationMinutes,
+      mealTime: newTime,
     );
     await diaryProvider.updateEntry(updated);
+  }
+
+  Future<void> _pickInlineTime(FoodDiaryEntry entry) async {
+    final current = _tempTime[entry.id] ?? entry.mealTime;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(current),
+      builder: (ctx, child) => MediaQuery(
+        data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
+        child: child!,
+      ),
+    );
+    if (picked == null || !mounted) return;
+    final newTime = DateTime(
+      current.year, current.month, current.day,
+      picked.hour, picked.minute,
+    );
+    setState(() => _tempTime[entry.id] = newTime);
+    await _saveInlineEdit(entry);
   }
 
   Widget _buildInlineSliders(FoodDiaryEntry entry) {
     final ml = (_tempMl[entry.id] ?? entry.milkAmountMl ?? 0).toDouble();
     final dur = (_tempDuration[entry.id] ?? entry.durationMinutes ?? 0).toDouble();
+    final mealTime = _tempTime[entry.id] ?? entry.mealTime;
     final color = entry.entryType.color;
 
+    final sliderTheme = SliderThemeData(
+      activeTrackColor: color,
+      thumbColor: color,
+      inactiveTrackColor: color.withValues(alpha: 0.2),
+      overlayColor: color.withValues(alpha: 0.1),
+      trackHeight: 3,
+      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+    );
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.04),
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
@@ -652,108 +687,135 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
       child: Column(
         children: [
           Divider(color: color.withValues(alpha: 0.15), height: 1),
-          const SizedBox(height: 10),
-          // ml 슬라이더
+          const SizedBox(height: 8),
+
+          // ── 기록 시각 ──
+          GestureDetector(
+            onTap: () => _pickInlineTime(entry),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.access_time_rounded, size: 15, color: color),
+                  const SizedBox(width: 6),
+                  Text(
+                    '기록 시각',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    DateFormat('HH:mm').format(mealTime),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.edit_rounded, size: 13, color: color.withValues(alpha: 0.6)),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // ── 양 슬라이더 (기저귀 제외) ──
+          if (entry.entryType != EntryType.diaper)
           Row(
             children: [
-              Icon(Icons.water_drop_rounded, size: 16, color: color),
+              Icon(Icons.water_drop_rounded, size: 15, color: color),
+              const SizedBox(width: 5),
+              Text('양', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
               const SizedBox(width: 6),
-              Text(
-                '양',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
-              ),
-              const SizedBox(width: 8),
               Expanded(
                 child: SliderTheme(
-                  data: SliderThemeData(
-                    activeTrackColor: color,
-                    thumbColor: color,
-                    inactiveTrackColor: color.withValues(alpha: 0.2),
-                    overlayColor: color.withValues(alpha: 0.1),
-                    trackHeight: 3,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-                  ),
+                  data: sliderTheme,
                   child: Slider(
                     value: ml.clamp(0, 300),
                     min: 0,
                     max: 300,
                     divisions: 60,
-                    onChanged: (v) =>
-                        setState(() => _tempMl[entry.id] = v.round()),
+                    onChanged: (v) => setState(() => _tempMl[entry.id] = v.round()),
                     onChangeEnd: (_) => _saveInlineEdit(entry),
                   ),
                 ),
               ),
               SizedBox(
-                width: 52,
+                width: 56,
                 child: Text(
                   '${ml.round()} ml',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: color,
-                  ),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
                   textAlign: TextAlign.right,
                 ),
               ),
             ],
           ),
-          // 수유 시간 슬라이더 (모유/유축만)
+
+          // ── 수유 지속 시간 슬라이더 (모유/유축만) ──
           if (entry.entryType.isMilkFeedingEntry) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Row(
               children: [
-                Icon(Icons.timer_outlined, size: 16, color: color),
+                Icon(Icons.timer_outlined, size: 15, color: color),
+                const SizedBox(width: 5),
+                Text('수유 시간', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
                 const SizedBox(width: 6),
-                Text(
-                  '시간',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(width: 8),
                 Expanded(
                   child: SliderTheme(
-                    data: SliderThemeData(
-                      activeTrackColor: color,
-                      thumbColor: color,
-                      inactiveTrackColor: color.withValues(alpha: 0.2),
-                      overlayColor: color.withValues(alpha: 0.1),
-                      trackHeight: 3,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-                    ),
+                    data: sliderTheme,
                     child: Slider(
                       value: dur.clamp(0, 60),
                       min: 0,
                       max: 60,
                       divisions: 60,
-                      onChanged: (v) =>
-                          setState(() => _tempDuration[entry.id] = v.round()),
+                      onChanged: (v) => setState(() => _tempDuration[entry.id] = v.round()),
                       onChangeEnd: (_) => _saveInlineEdit(entry),
                     ),
                   ),
                 ),
                 SizedBox(
-                  width: 52,
+                  width: 56,
                   child: Text(
                     '${dur.round()}분',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: color,
-                    ),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
                     textAlign: TextAlign.right,
                   ),
                 ),
               ],
             ),
           ],
+
+          const SizedBox(height: 8),
+
+          // ── 상세 편집 버튼 ──
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                final original = context.read<DiaryProvider>().getEntryById(entry.id) ?? entry;
+                _showAddEntrySheet(context, entryToEdit: original);
+              },
+              icon: Icon(Icons.edit_note_rounded, size: 16, color: color),
+              label: Text(
+                '상세 편집',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: color.withValues(alpha: 0.4)),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -858,6 +920,12 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                     color: const Color(0xFF8D6E63),
                     onTap: () => _quickAdd(EntryType.diaper,
                         diaperType: DiaperType.soiled),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildQuickFab(
+                    label: '😴 수면',
+                    color: const Color(0xFF7E57C2),
+                    onTap: () => _quickAdd(EntryType.sleep),
                   ),
                   const SizedBox(height: 10),
                   _buildQuickFab(
@@ -1088,10 +1156,10 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
         child: Column(
           children: [
             InkWell(
-              borderRadius: entry.entryType.isLiquidEntry
+              borderRadius: (entry.entryType.isLiquidEntry || entry.entryType == EntryType.diaper)
                   ? const BorderRadius.vertical(top: Radius.circular(16))
                   : BorderRadius.circular(16),
-              onTap: entry.entryType.isLiquidEntry
+              onTap: (entry.entryType.isLiquidEntry || entry.entryType == EntryType.diaper)
                   ? () => _toggleInlineEdit(entry)
                   : null,
               child: Padding(
@@ -1147,7 +1215,7 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                       ),
                     ),
                     // 수정 / 펼치기 버튼
-                    if (entry.entryType.isLiquidEntry)
+                    if (entry.entryType.isLiquidEntry || entry.entryType == EntryType.diaper)
                       Icon(
                         _expandedEntryIds.contains(entry.id)
                             ? Icons.keyboard_arrow_up_rounded
@@ -1159,8 +1227,10 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                       IconButton(
                         icon: Icon(Icons.edit_outlined,
                             size: 18, color: Colors.grey.shade400),
-                        onPressed: () =>
-                            _showAddEntrySheet(context, entryToEdit: entry),
+                        onPressed: () {
+                          final original = context.read<DiaryProvider>().getEntryById(entry.id) ?? entry;
+                          _showAddEntrySheet(context, entryToEdit: original);
+                        },
                         constraints: const BoxConstraints(),
                         padding: const EdgeInsets.all(6),
                       ),
@@ -1168,8 +1238,8 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                 ),
               ),
             ),
-            // 인라인 슬라이더 패널 (수유/모유만)
-            if (entry.entryType.isLiquidEntry)
+            // 인라인 패널 (수유/모유/기저귀)
+            if (entry.entryType.isLiquidEntry || entry.entryType == EntryType.diaper)
               AnimatedCrossFade(
                 duration: const Duration(milliseconds: 200),
                 crossFadeState: _expandedEntryIds.contains(entry.id)
@@ -1445,10 +1515,38 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     } else {
       durationStr = '$min분';
     }
+
+    // 전날 수면이 이날로 이어진 경우
+    final isCarryOver = entry.entryType == EntryType.sleep &&
+        DateTime(entry.date.year, entry.date.month, entry.date.day) !=
+            DateTime(_selectedDay.year, _selectedDay.month, _selectedDay.day);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildTypeChip(entry.entryType),
+        Row(
+          children: [
+            _buildTypeChip(entry.entryType),
+            if (isCarryOver) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7E57C2).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  '전날부터',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF7E57C2),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
         const SizedBox(height: 6),
         Text(
           durationStr,
@@ -1598,6 +1696,14 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
         text: entryToEdit?.temperatureCelsius?.toString() ?? '');
     final durationController = TextEditingController(
         text: entryToEdit?.durationMinutes?.toString() ?? '');
+    final durationHourController = TextEditingController(
+        text: entryToEdit?.durationMinutes != null
+            ? (entryToEdit!.durationMinutes! ~/ 60).toString()
+            : '');
+    final durationMinPartController = TextEditingController(
+        text: entryToEdit?.durationMinutes != null
+            ? (entryToEdit!.durationMinutes! % 60).toString()
+            : '');
 
     String searchQuery = '';
     int? selectedMl = entryToEdit?.milkAmountMl;
@@ -1831,12 +1937,36 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                             entryType: type,
                             selected: selectedDuration,
                             controller: durationController,
+                            hourController: durationHourController,
+                            minPartController: durationMinPartController,
                             onSelect: (d) => setSheetState(() {
                               selectedDuration = d;
                               durationController.text = d.toString();
+                              durationHourController.text = (d ~/ 60).toString();
+                              durationMinPartController.text = (d % 60).toString();
                             }),
                             onChange: (v) => setSheetState(
                                 () => selectedDuration = int.tryParse(v)),
+                            onNow: type == EntryType.sleep
+                                ? () {
+                                    final now = TimeOfDay.now();
+                                    final startMins =
+                                        selectedTime.hour * 60 + selectedTime.minute;
+                                    final nowMins =
+                                        now.hour * 60 + now.minute;
+                                    // 자정을 넘긴 경우(예: 저녁 시작 → 새벽) 처리
+                                    var diff = nowMins - startMins;
+                                    if (diff < 0) diff += 24 * 60;
+                                    final h = diff ~/ 60;
+                                    final m = diff % 60;
+                                    setSheetState(() {
+                                      selectedDuration = diff;
+                                      durationController.text = diff.toString();
+                                      durationHourController.text = h.toString();
+                                      durationMinPartController.text = m.toString();
+                                    });
+                                  }
+                                : null,
                           ),
                         ],
 
@@ -2430,17 +2560,69 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
     required TextEditingController controller,
     required void Function(int) onSelect,
     required void Function(String) onChange,
+    TextEditingController? hourController,
+    TextEditingController? minPartController,
+    VoidCallback? onNow,
   }) {
-    final presets = entryType == EntryType.sleep
-        ? [30, 60, 90, 120, 150, 180]
+    final isSleep = entryType == EntryType.sleep;
+    final presets = isSleep
+        ? [30, 60, 90, 120, 180, 240]
         : [5, 10, 15, 20, 30, 45];
+
+    final inputDecoration = InputDecoration(
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('${entryType.displayName} 시간 (분)',
-            style: const TextStyle(
-                fontSize: 14, fontWeight: FontWeight.w600)),
+        Row(
+          children: [
+            Text('${entryType.displayName} 시간',
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w600)),
+            const Spacer(),
+            if (isSleep && onNow != null)
+              GestureDetector(
+                onTap: onNow,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: entryType.color,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.bedtime_rounded,
+                          size: 13, color: Colors.white),
+                      const SizedBox(width: 4),
+                      const Text(
+                        '지금까지',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -2451,7 +2633,7 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
             if (min >= 60) {
               final h = min ~/ 60;
               final m = min % 60;
-              label = m > 0 ? '${h}h${m}m' : '${h}h';
+              label = m > 0 ? '$h시간 $m분' : '$h시간';
             } else {
               label = '$min분';
             }
@@ -2471,9 +2653,7 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: isSelected
-                          ? Colors.white
-                          : entryType.color,
+                      color: isSelected ? Colors.white : entryType.color,
                     ),
                   ),
                 ),
@@ -2482,27 +2662,55 @@ class _FoodDiaryScreenState extends State<FoodDiaryScreen> {
           }).toList(),
         ),
         const SizedBox(height: 12),
-        TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            hintText: '직접 입력 (분)',
-            suffixText: '분',
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.grey.shade200),
+        // 수면은 시/분 분리 입력, 나머지는 분 단독 입력
+        if (isSleep && hourController != null && minPartController != null)
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: hourController,
+                  keyboardType: TextInputType.number,
+                  decoration: inputDecoration.copyWith(
+                    hintText: '0',
+                    suffixText: '시간',
+                  ),
+                  onChanged: (v) {
+                    final h = int.tryParse(v) ?? 0;
+                    final m = int.tryParse(minPartController.text) ?? 0;
+                    final total = h * 60 + m;
+                    onChange(total.toString());
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: minPartController,
+                  keyboardType: TextInputType.number,
+                  decoration: inputDecoration.copyWith(
+                    hintText: '0',
+                    suffixText: '분',
+                  ),
+                  onChanged: (v) {
+                    final h = int.tryParse(hourController.text) ?? 0;
+                    final m = int.tryParse(v) ?? 0;
+                    final total = h * 60 + m;
+                    onChange(total.toString());
+                  },
+                ),
+              ),
+            ],
+          )
+        else
+          TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: inputDecoration.copyWith(
+              hintText: '직접 입력',
+              suffixText: '분',
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.grey.shade200),
-            ),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            onChanged: onChange,
           ),
-          onChanged: onChange,
-        ),
       ],
     );
   }

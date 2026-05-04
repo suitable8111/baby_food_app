@@ -21,6 +21,8 @@ import 'food_diary_screen.dart';
 import 'timeline_screen.dart';
 import 'family_screen.dart';
 import 'family_chat_screen.dart';
+import 'weekly_stats_screen.dart';
+import 'baby_milestones_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -211,6 +213,17 @@ class HomeScreen extends StatelessWidget {
                     if (!isLoggedIn) { _showLoginRequired(context); return; }
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const MyRecipesScreen()));
+                  },
+                ),
+                _DrawerMenuItem(
+                  icon: Icons.auto_awesome_rounded,
+                  label: '우리 아이 첫순간',
+                  iconColor: const Color(0xFFEC407A),
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (!isLoggedIn) { _showLoginRequired(context); return; }
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const BabyMilestonesScreen()));
                   },
                 ),
 
@@ -605,7 +618,7 @@ class HomeScreen extends StatelessWidget {
                     child: _QuickMenuCard(
                       icon: Icons.book_rounded,
                       title: '우리아이 기록',
-                      subtitle: '이유식·수유 일지',
+                      subtitle: '수유·이유식 일지',
                       gradient: const [Color(0xFF42A5F5), Color(0xFF1E88E5)],
                       compact: true,
                       onTap: () => Navigator.push(
@@ -614,7 +627,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: _QuickMenuCard(
                       icon: Icons.timeline_rounded,
@@ -628,7 +641,38 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _QuickMenuCard(
+                      icon: Icons.bar_chart_rounded,
+                      title: '주간 분석',
+                      subtitle: '수면·수유 통계',
+                      gradient: const [Color(0xFF26A69A), Color(0xFF00796B)],
+                      compact: true,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const WeeklyStatsScreen()),
+                      ),
+                    ),
+                  ),
                 ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+              child: _QuickMenuCard(
+                icon: Icons.auto_awesome_rounded,
+                title: '우리 아이 첫순간',
+                subtitle: '성장 이정표 기록',
+                gradient: const [Color(0xFFEC407A), Color(0xFFFF6F00)],
+                onTap: () {
+                  if (!context.read<AuthProvider>().isAuthenticated) {
+                    _showLoginRequired(context);
+                    return;
+                  }
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const BabyMilestonesScreen()));
+                },
               ),
             ),
 
